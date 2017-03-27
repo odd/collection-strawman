@@ -8,12 +8,12 @@ import strawman.collection.{ immutable, IterableOnce, IterableFactory, MonoBuild
 import strawman.collection.mutable.{ArrayBuffer, Builder}
 
 /**
-  * A <i>spandex</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
+  * A <i>Spandex</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
   * <ul>
   * <li>constant time <code>head</code>, <code>last</code>, <code>tail</code>, <code>init</code>, <code>take</code>, <code>drop</code> and <code>reverse</code> (<code>last</code> and <code>init</code> are not included in this implementation however)</li>
   * <li>amortised constant time <code>prepend</code> and <code>append</code> (depending on the complexity of <code>scala.Array.copy</code>)</li>
   * <li>efficient indexed access</li>
-  * <li>linear time iteration (i.e. <code>filter</code>, <code>map</code>, <code>flatMap</code>, <code>foreach</code> etc) with low constant factors
+  * <li>linear time iteration (i.e. <code>iterator</code> and <code>foreach</code>) with low constant factors
   * <li>reasonable memory usage (at most double (plus constants) that of an array with the same number of elements)
   * </ul>
   * <br/>
