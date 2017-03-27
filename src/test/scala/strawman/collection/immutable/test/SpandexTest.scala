@@ -352,11 +352,37 @@ class SpandexTest {
   @Test
   def testTrim(): Unit = {
     assertEquals("empty trimmed is empty", Spandex.empty, Spandex.fromIterable(List.empty).trim())
-    assertEquals("single trimmed has elements array of correct length", 1, Spandex(1).trim().asInstanceOf[Spandex.Primary[Int]].elements.length)
-    assertEquals("single trimmed has elements array with correct element", 1, Spandex(1).trim().asInstanceOf[Spandex.Primary[Int]].elements(0))
-    assertEquals("multiple trimmed has elements array of correct length", 3, Spandex(1, 2, 3).trim().asInstanceOf[Spandex.Primary[Int]].elements.length)
-    assertEquals("multiple trimmed has elements array with correct element", 1, Spandex(1, 2, 3).trim().asInstanceOf[Spandex.Primary[Int]].elements(0))
-    assertEquals("multiple trimmed has elements array with correct element", 2, Spandex(1, 2, 3).trim().asInstanceOf[Spandex.Primary[Int]].elements(1))
-    assertEquals("multiple trimmed has elements array with correct element", 3, Spandex(1, 2, 3).trim().asInstanceOf[Spandex.Primary[Int]].elements(2))
+    assertEquals("single trimmed has elements array of correct length", 1, Spandex(1).trim().primary.elements.length)
+    assertEquals("single trimmed has elements array with correct element", 1, Spandex(1).trim().primary.elements(0))
+    assertEquals("multiple trimmed has elements array of correct length", 3, Spandex(1, 2, 3).trim().primary.elements.length)
+    assertEquals("multiple trimmed has elements array with correct element", 1, Spandex(1, 2, 3).trim().primary.elements(0))
+    assertEquals("multiple trimmed has elements array with correct element", 2, Spandex(1, 2, 3).trim().primary.elements(1))
+    assertEquals("multiple trimmed has elements array with correct element", 3, Spandex(1, 2, 3).trim().primary.elements(2))
+  }
+  @Test
+  def testPrependEqElement(): Unit = {
+    val a = Spandex(1, 2, 3)
+    val b = 1 +: a.tail
+    val c = 0 +: a.tail
+    val d = "0" +: a.tail
+    val e = "0" +: d.tail
+    val f = "0" +: a.tail
+    assertSame("append equal single on init equals original", a.primary.elements, b.primary.elements)
+    assertNotSame("append equal single on init equals original", a.primary.elements, c.primary.elements)
+    assertSame("append equal single on init equals original", d.primary.elements, e.primary.elements)
+    assertNotSame("append equal single on init equals original", d.primary.elements, f.primary.elements)
+  }
+  @Test
+  def testAppendEqElement(): Unit = {
+    val a = Spandex(1, 2, 3)
+    val b = a.take(2) :+ 3
+    val c = a.take(2) :+ 4
+    val d = a.take(2) :+ "3"
+    val e = d.take(2) :+ "3"
+    val f = a.take(2) :+ "3"
+    assertSame("append equal single on init equals original", a.primary.elements, b.primary.elements)
+    assertNotSame("append equal single on init equals original", a.primary.elements, c.primary.elements)
+    assertSame("append equal single on init equals original", d.primary.elements, e.primary.elements)
+    assertNotSame("append equal single on init equals original", d.primary.elements, f.primary.elements)
   }
 }

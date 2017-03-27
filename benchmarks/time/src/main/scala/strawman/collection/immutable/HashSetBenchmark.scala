@@ -14,18 +14,18 @@ import scala.Predef.intWrapper
 @Warmup(iterations = 12)
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
-class SpandexBenchmark {
+class HashSetBenchmark {
 
   @Param(scala.Array(/*"0", */"1", "2", "3", "4", "7", "8"/*, "15"*/, "16", "17", "39", "282", "4096", "31999"/*, "73121", "7312102"*/))
   var size: Int = _
 
-  var xs: Spandex[Long] = _
-  var xss: scala.Array[Spandex[Long]] = _
+  var xs: HashSet[Long] = _
+  var xss: scala.Array[HashSet[Long]] = _
   var randomIndices: scala.Array[Int] = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection() = Spandex((1 to size).map(_.toLong): _*)
+    def freshCollection() = HashSet((1 to size).map(_.toLong): _*)
     xs = freshCollection()
     xss = scala.Array.fill(1000)(freshCollection())
     if (size > 0) {
@@ -36,10 +36,10 @@ class SpandexBenchmark {
   @Benchmark
 //  @OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
-    var ys = Spandex.empty[Long]
+    var ys = HashSet.empty[Long]
     var i = 0L
     while (i < size) {
-      ys = i +: ys // Note: In the case of TreeSet, always inserting elements that are already ordered creates a bias
+      ys = ys + i
       i = i + 1
     }
     bh.consume(ys)
@@ -55,7 +55,7 @@ class SpandexBenchmark {
   def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
-//  @OperationsPerInvocation(size)
+  //  @OperationsPerInvocation(size)
   def foreach_while(bh: Blackhole): Unit = {
     var ys = xs
     while (ys.nonEmpty) {
@@ -98,8 +98,10 @@ class SpandexBenchmark {
   @Benchmark
   def map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
 
+  /*
   @Benchmark
   def reverse(bh: Blackhole): Any = bh.consume(xs.reverse)
+   */
 
   @Benchmark
   def foldLeft(bh: Blackhole): Any = bh.consume(xs.foldLeft(0) {

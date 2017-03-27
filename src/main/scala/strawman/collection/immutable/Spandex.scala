@@ -19,10 +19,13 @@ import strawman.collection.mutable.{ArrayBuffer, Builder}
   * <li>reasonable memory usage (at most double (plus constants) that of an array with the same number of elements)
   * </ul>
   * <br/>
-  * The underlying array is only mutated on <code>prepend</code> and <code>append</code> but never more than once for any given position (any later modification attempts to an already modified position results in a copy being made of the underlying array). To guarantee that only a single thread can write to an array slot a pair of atomic integers are used to guard the low and high assignments in <code>prepend</code> and <code>append</code>.
+  * The underlying array is only mutated on <code>prepend</code> and <code>append</code> but never more than once for any given position (any later modification attempts to an already modified position results in a copy being made of the underlying array).
+  * To guarantee that only a single thread can write to an array slot a pair of atomic integers are used to guard the low and high assignments in <code>prepend</code> and <code>append</code>.
   * <br/>
   * <br/>
-  * Expansion occurs when the underlying array is full on the effected side; the new array will be populated to have its center position adjusted by the unused capacity (margin) on the non effected side according to the following formula: <code>starting position = (length + margin) / 2</code> (i.e. for a six element spandex with two slots unused at the end <code>[a, b, c, d, e, f, , ]</code>, a prepend operation would make the expanded array have a length of 12 and a starting position of <code>(6 + 2) / 2 = 4</code>, <code>[ , , , , a, b, c, d, e, f, , ]</code>). This expansion scheme leads to more free slots being allocated on the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides).
+  * Expansion occurs when the underlying array is full on the effected side; the new array will be populated to have its start position adjusted by the unused capacity (margin) on the non effected side according to the following formula:
+  * <code>starting position = (length + margin) / 2</code> (i.e. for a six element spandex with two slots unused at the end <code>[a, b, c, d, e, f, , ]</code>, a prepend operation would make the expanded array have a length of 12 and a starting position
+  * of <code>(6 + 2) / 2 = 4</code>, <code>[ , , , , a, b, c, d, e, f, , ]</code>). This expansion scheme leads to more free slots being allocated on the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides).
   */
 sealed abstract class Spandex[+A](protected val index: Int, override val length: Int)
   extends Seq[A]
@@ -190,27 +193,6 @@ sealed abstract class Spandex[+A](protected val index: Int, override val length:
     var acc = z
     foreach(x => acc = op(acc, x))
     acc
-    /*
-    if (reversed) {
-      var acc = z
-      var i = index + length - 1
-      val n = index
-      while (i >= n) {
-        acc = op(acc, element(i))
-        i -= 1
-      }
-      acc
-    } else {
-      var acc = z
-      var i = index
-      val n = index + length
-      while (i < n) {
-        acc = op(acc, element(i))
-        i += 1
-      }
-      acc
-    }
-    */
   }
 
   override final def foldRight[B](z: B)(op: (A, B) => B): B = {
@@ -397,4 +379,6 @@ object Spandex extends IterableFactory[Spandex] {
 
   override def newBuilder[A]: Builder[A, Spandex[A]] =
     new ArrayBuffer[A].mapResult(b => b.to(Spandex))
+
+  override def empty[A <: Any]: Spandex[A] = Spandex.Empty
 }
