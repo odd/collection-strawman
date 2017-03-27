@@ -1,6 +1,6 @@
 package bench
 
-import strawman.collection.immutable.{LazyList, List}
+import strawman.collection.immutable.{LazyList, List, Spandex}
 
 import scala.{Any, AnyRef, App, Int, Long, Seq, StringContext}
 import scala.Predef.{ArrowAssoc, println}
@@ -41,7 +41,8 @@ object MemoryFootprint extends App {
       "List"        -> benchmark(List.fill(_)(obj)),
       "LazyList"    -> benchmark(LazyList.fill(_)(obj)),
       "ArrayBuffer" -> benchmark(ArrayBuffer.fill(_)(obj)),
-      "ListBuffer"  -> benchmark(ListBuffer.fill(_)(obj))
+      "ListBuffer"  -> benchmark(ListBuffer.fill(_)(obj)),
+      "Spandex"     -> benchmark(Spandex.fill(_)(obj))
     )
 
   // We use a format similar to the one used by JMH so that

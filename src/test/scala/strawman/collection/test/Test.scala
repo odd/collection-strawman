@@ -6,7 +6,7 @@ import scala.{Either, Int, Left, Nothing, Unit, Array, Option, StringContext, Bo
 import scala.Predef.{assert, println, charWrapper}
 
 import collection._
-import collection.immutable.{List, Nil, LazyList}
+import collection.immutable.{List, Nil, LazyList, Spandex}
 import collection.mutable.{ArrayBuffer, ListBuffer}
 import org.junit.Test
 
@@ -216,6 +216,48 @@ class StrawmanTest {
     println(xs16.view)
   }
 
+  def spandexOps(xs: Spandex[Int]): Unit = {
+    val x1 = xs.foldLeft("")(_ + _)
+    val y1: String = x1
+    val x2 = xs.foldRight("")(_ + _)
+    val y2: String = x2
+    val x3 = xs.indexWhere(_ % 2 == 0)
+    val y3: Int = x3
+    val x4 = xs.head
+    val y4: Int = x4
+    val x5 = xs.to(List)
+    val y5: List[Int] = x5
+    val (xs6, xs7) = xs.partition(_ % 2 == 0)
+    val ys6: Spandex[Int] = xs6
+    val ys7: Spandex[Int] = xs7
+    val xs8 = xs.drop(2)
+    val ys8: Spandex[Int] = xs8
+    val xs10 = xs.flatMap(x => List(x, -x))
+    val ys10: Spandex[Int] = xs10
+    val xs11 = xs ++ xs
+    val ys11: Spandex[Int] = xs11
+    val xs13 = Nil ++ xs
+    val ys13: List[Int] = xs13
+    val xs14 = xs ++ (("a": Any) :: Nil)
+    val ys14: Spandex[Any] = xs14
+    val xs16 = xs.reverse
+    val ys16: Spandex[Int] = xs16
+    println("-SPANDEX------")
+    println(x1)
+    println(x2)
+    println(x3)
+    println(x4)
+    println(x5)
+    println(xs6.view)
+    println(xs7.view)
+    println(xs8.view)
+    println(xs10.view)
+    println(xs11.view)
+    println(xs13)
+    println(xs14.view)
+    println(xs16.view)
+  }
+
   def lazyListOps(xs: Seq[Int]): Unit = {
     val x1 = xs.foldLeft("")(_ + _)
     val y1: String = x1
@@ -371,6 +413,7 @@ class StrawmanTest {
     viewOps(intsView)
     stringOps("abc")
     arrayOps(Array(1, 2, 3))
+    spandexOps(Spandex(1, 2, 3))
     lazyListOps(LazyList(1, 2, 3))
     equality()
   }
