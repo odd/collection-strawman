@@ -34,6 +34,7 @@ sealed abstract class Spandex[+A]
 
   override def size: Int = length
   override def knownSize: Int = length
+  override def isEmpty: Boolean = length == 0
 
   protected def element(i: Int): A = scala.runtime.ScalaRunTime.array_apply(array, i).asInstanceOf[A]
   protected def shift(i: Int): Int = index + i
@@ -50,18 +51,23 @@ sealed abstract class Spandex[+A]
   def :+[B >: A](b: B): Spandex[B]
 
   override def ++[B >: A](xs: IterableOnce[B]): Spandex[B] = xs match {
-    case bs: Spandex[B] =>
-      Spandex.tabulate(length + bs.length) {
-        case i if i < length => apply(i)
-        case i => bs(i - length)
+    case that: Spandex[B] =>
+      if (that.isEmpty) this
+      else {
+        val size = this.size + that.size
+        val array = new Array[Any](size * 2)
+        val index = size / 2
+        Array.copy(this.array, this.index, array, index, this.size)
+        Array.copy(that.array, that.index, array, this.size + index, that.size)
+        new Spandex.Primary[A](index, size, array)
       }
     case _ => fromIterable(View.Concat(coll, xs))
   }
 
   override def zip[B](xs: IterableOnce[B]): Spandex[(A, B)] = xs match {
-    case bs: Spandex[B] =>
-      Spandex.tabulate(math.min(length, bs.length)) { i =>
-        (apply(i), bs(i))
+    case that: Spandex[B] =>
+      Spandex.tabulate(math.min(this.length, that.length)) { i =>
+        (this.apply(i), that.apply(i))
       }
     case _ => fromIterable[(A, B)](View.Zip[A, B](coll, xs))
   }
@@ -153,10 +159,12 @@ object Spandex extends IterableFactory[Spandex] {
   private[immutable] final object Empty extends Primary[Nothing](0, 0, Array.empty) {
     override def +:[B >: Nothing](b: B): Spandex[B] = Spandex(b)
     override def :+[B >: Nothing](b: B): Spandex[B] = Spandex(b)
-    override def ++[B >: Nothing](xs: IterableOnce[B]): Spandex[B] = {
-      val builder = Spandex.newBuilder[B]
-      builder ++= xs
-      Spandex.fromIterable(builder.result)
+    override def ++[B >: Nothing](xs: IterableOnce[B]): Spandex[B] = xs match {
+      case that: Spandex[B] => that
+      case _ =>
+        val builder = Spandex.newBuilder[B]
+        builder ++= xs
+        Spandex.fromIterable(builder.result)
     }
   }
 
@@ -202,14 +210,14 @@ object Spandex extends IterableFactory[Spandex] {
   def apply[A](it: Iterable[A]): Spandex[A] =
     fromIterable(it)
 
-  private[Spandex] def apply[A](index: Int, n: Int, xs: Array[Any]): Spandex[A] = {
+  private[Spandex] def apply[A](i: Int, n: Int, xs: Array[Any]): Spandex[A] = {
     if (n == 0) Spandex.Empty
     else {
       val capacity = math.max(n * 2, 8)
       val array = new Array[Any](capacity)
-      val first = (capacity - n) / 2
-      Array.copy(xs, index, array, first, n)
-      new Primary[A](first, n, array)
+      val index = (capacity - n) / 2
+      Array.copy(xs, i, array, index, n)
+      new Primary[A](index, n, array)
     }
   }
 
@@ -235,7 +243,7 @@ object Spandex extends IterableFactory[Spandex] {
     tabulate(n)(_ => elem)
 
   def fromIterable[A](it: collection.Iterable[A]): Spandex[A] = it match {
-    case b: Spandex[A] ⇒ b
+    case that: Spandex[A] ⇒ that
     case c if c.isEmpty => Spandex.Empty
     case _ ⇒
       val array = ArrayBuffer.fromIterable(it).asInstanceOf[ArrayBuffer[Any]].toArray
