@@ -1,10 +1,11 @@
 package strawman.collection.immutable
 
-import scala.{ volatile, Any, AnyRef, Array, Boolean, Float, Int, None, Nothing, Option, Some, StringContext, ArrayIndexOutOfBoundsException }
-import scala.Predef.{???, println, String, identity}
+import scala.{Any, AnyRef, Unit, Array, ArrayIndexOutOfBoundsException, Boolean, Float, Int, None, Nothing, Option, Some, StringContext, volatile}
+import scala.Predef.{???, String, identity, println}
 import scala.math
+import scala.reflect.ClassTag
 import strawman.collection
-import strawman.collection.{ immutable, IterableOnce, IterableFactory, MonoBuildable, PolyBuildable, Iterator, LinearSeq, SeqLike, View }
+import strawman.collection.{BuildFrom, IterableFactory, IterableOnce, Iterator, LinearSeq, MonoBuildable, PolyBuildable, SeqLike, View, immutable}
 import strawman.collection.mutable.{ArrayBuffer, Builder}
 
 /**
@@ -35,6 +36,7 @@ sealed abstract class Spandex[+A]
   override def size: Int = length
   override def knownSize: Int = length
   override def isEmpty: Boolean = length == 0
+  override def nonEmpty: Boolean = !isEmpty
 
   protected def element(i: Int): A = scala.runtime.ScalaRunTime.array_apply(array, i).asInstanceOf[A]
   protected def shift(i: Int): Int = index + i
@@ -46,21 +48,26 @@ sealed abstract class Spandex[+A]
     if (i < 0 || i >= length) throw new ArrayIndexOutOfBoundsException(i)
     else fetch(i)
 
+  override def head: A = apply(0)
+
+  override def tail: Spandex[A] =
+    if (length > 0) new Spandex.Secondary[A](primary, shift(1), length - 1)
+    else ???
+
   def +:[B >: A](b: B): Spandex[B]
 
   def :+[B >: A](b: B): Spandex[B]
 
   override def ++[B >: A](xs: IterableOnce[B]): Spandex[B] = xs match {
+    case that: Spandex[B] if that.isEmpty => this
+    case that: Spandex.Secondary[B] if that.reversed => fromIterable(View.Concat(coll, xs))
     case that: Spandex[B] =>
-      if (that.isEmpty) this
-      else {
-        val size = this.size + that.size
-        val array = new Array[Any](size * 2)
-        val index = size / 2
-        Array.copy(this.array, this.index, array, index, this.size)
-        Array.copy(that.array, that.index, array, this.size + index, that.size)
-        new Spandex.Primary[A](index, size, array)
-      }
+      val size = this.size + that.size
+      val array = new Array[Any](size * 2)
+      val index = size / 2
+      Array.copy(this.array, this.index, array, index, this.size)
+      Array.copy(that.array, that.index, array, this.size + index, that.size)
+      new Spandex.Primary[A](index, size, array)
     case _ => fromIterable(View.Concat(coll, xs))
   }
 
@@ -92,10 +99,6 @@ sealed abstract class Spandex[+A]
   override def drop(n: Int): Spandex[A] =
     new Spandex.Secondary[A](primary, shift(math.min(n, length)), math.max(0, length - n))
 
-  override def tail: Spandex[A] =
-    if (length > 0) new Spandex.Secondary[A](primary, shift(1), length - 1)
-    else ???
-
   override def reverse: Spandex[A] =
     new Spandex.Secondary[A](primary, index, length, true)
 
@@ -106,6 +109,44 @@ sealed abstract class Spandex[+A]
       i += 1
       fetch(i - 1)
     }
+  }
+
+  override def foreach[U](f: (A) => U): Unit = {
+    var i = 0
+    while (i < length) {
+      f(fetch(i))
+      i += 1
+    }
+  }
+
+  override def foldLeft[B](z: B)(op: (B, A) => B): B = {
+    var acc = z
+    foreach(x => acc = op(acc, x))
+    acc
+  }
+
+  override def foldRight[B](z: B)(op: (A, B) => B): B = {
+    reverse.foldLeft(z) {
+      case (acc, x) => op(x, acc)
+    }
+  }
+
+  override def indexWhere(p: (A) => Boolean): Int = {
+    var i = 0
+    while (i < length) {
+      if (p(fetch(i))) return i
+      i += 1
+    }
+    -1
+  }
+
+  override def toArray[B >: A: ClassTag]: Array[B] =
+    copyToArray(new Array[B](this.length))
+
+  override def copyToArray[B >: A](xs: Array[B], start: Int): xs.type = {
+    if (start < 0 || start > length) throw new ArrayIndexOutOfBoundsException(start)
+    Array.copy(this.array, this.index + start, xs, 0, this.length - start)
+    xs
   }
 
   def fromIterable[B](c: collection.Iterable[B]): Spandex[B] =
@@ -202,6 +243,24 @@ object Spandex extends IterableFactory[Spandex] {
         case k if k == length ⇒ b
         case k ⇒ fetch(k)
       }
+
+    /* Don't use optimized implementation from Spandex if this is reversed since array copy won't work for reversees */
+    override def ++[B >: A](xs: IterableOnce[B]): Spandex[B] = {
+      if (reversed) fromIterable(View.Concat(coll, xs))
+      else super.++(xs)
+    }
+
+    /* Don't use optimized implementation from Spandex if this is reversed since array copy won't work for reversees */
+    override def copyToArray[B >: A](xs: Array[B], start: Int): xs.type =
+      if (reversed) {
+        var i = start
+        val it = iterator()
+        while (it.hasNext) {
+          xs(i) = it.next()
+          i += 1
+        }
+        xs
+      } else super.copyToArray(xs, start)
   }
 
   override def apply[A](xs: A*): Spandex[A] =

@@ -50,9 +50,19 @@ class LazyListBenchmark {
   }
 
   @Benchmark
+  def iterator(): Any = {
+    var n = 0
+    val it = xs.iterator()
+    while (it.hasNext) if (it.next() eq null) n += 1
+    n
+  }
+
+  @Benchmark
   def lookup(): Any = xs(size - 1)
 
   @Benchmark
   def map(): Any = xs.map(x => if (x eq null) "foo" else "bar")
 
+  @Benchmark
+  def reverse(): Any = xs.reverse
 }

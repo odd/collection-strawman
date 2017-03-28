@@ -80,6 +80,10 @@ class SpandexTest {
       case n if n % 2 == 0 => Spandex(n, n * n)
       case _ => Spandex.empty
     })
+    assertEquals("flatmap multiple reversed", Spandex(4, 16, 2, 4), Spandex(1, 2, 3, 4).reverse.flatMap {
+      case n if n % 2 == 0 => Spandex(n, n * n)
+      case _ => Spandex.empty
+    })
   }
   @Test
   def testFill(): Unit = {
@@ -96,16 +100,46 @@ class SpandexTest {
       "prepend multiple over beginning of array",
       Spandex(-2, -1, 0, 1, 2, 3, 4, 5, 6),
       -2 +: -1 +: 0 +: Spandex(1, 2, 3, 4, 5, 6))
+    assertEquals(
+      "prepend multiple with itself reversed",
+      Spandex(-2, -1, 0, 1, 2, 3, 4, 5, 6),
+      -2 +: -1 +: 0 +: Spandex(1, 2, 3, 4, 5, 6))
   }
   @Test
   def testAppend(): Unit = {
     assertEquals("append on empty", Spandex(1), Spandex.empty :+ 1)
     assertEquals("append single", Spandex(1, 2, 3, 4), Spandex(1, 2, 3) :+ 4)
     assertEquals("append multiple", Spandex(1, 2, 3, 4, 5), Spandex(1, 2, 3) :+ 4 :+ 5)
+  }
+  @Test
+  def testConcat(): Unit = {
+    assertEquals("concat empty with empty", Spandex.empty, Spandex.empty ++ Spandex.empty)
+    assertEquals("concat empty with single", Spandex(1), Spandex.empty ++ Spandex(1))
+    assertEquals("concat single with empty", Spandex(1), Spandex(1) ++ Spandex.empty)
+    assertEquals("concat empty with multiple", Spandex(1, 2, 3), Spandex.empty ++ Spandex(1, 2, 3))
+    assertEquals("concat multiple with empty", Spandex(1, 2, 3), Spandex(1, 2, 3) ++ Spandex.empty)
+    assertEquals("concat single with single", Spandex(1, 2), Spandex(1) ++ Spandex(2))
+    assertEquals("concat single with multiple", Spandex(1, 2, 3, 4), Spandex(1) ++ (Spandex(2) :+ 3 :+ 4))
+    assertEquals("concat multiple with single", Spandex(1, 2, 3, 4), (Spandex(1) :+ 2 :+ 3) ++ Spandex(4))
+    val full = 1 +: 2 +: Spandex(3, 4, 5, 6) :+ 7 :+ 8
+    assertEquals("concat empty with full", Spandex(1, 2, 3, 4, 5, 6, 7, 8), Spandex.empty ++ full)
+    assertEquals("concat full with empty", Spandex(1, 2, 3, 4, 5, 6, 7, 8), full ++ Spandex.empty)
+    assertEquals("concat single with full", Spandex(0, 1, 2, 3, 4, 5, 6, 7, 8), Spandex(0) ++ full)
+    assertEquals("concat full with single", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9), full ++ Spandex(9))
+    assertEquals("concat full with full", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8), full ++ full)
+    assertEquals("concat full with full reversed", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1), full ++ full.reverse)
+    assertEquals("concat full reversed with full", Spandex(8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8), full.reverse ++ full)
+    assertEquals("concat full with full mapped reversed", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 64, 49, 36, 25, 16, 9, 4, 1), full ++ full.reverse.map(x => x * x))
+    assertEquals("concat full mapped reversed with full", Spandex(64, 49, 36, 25, 16, 9, 4, 1, 1, 2, 3, 4, 5, 6, 7, 8), full.reverse.map(x => x * x) ++ full)
+    val large = -1 +: 0 +: full :+ 9 :+ 10 :+ 11
     assertEquals(
-      "append multiple over end of array",
-      Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12),
-      (Spandex(1, 2, 3, 4, 5, 6, 7) :+ 8) ++ Spandex(9, 10, 11, 12))
+      "concat large with multiple",
+      Spandex(-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),
+      large ++ Spandex(12, 13, 14))
+    assertEquals(
+      "concat large with itself reversed",
+      Spandex(-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, -1),
+      large ++ large.reverse)
   }
   @Test
   def testImmutablity(): Unit = {
@@ -239,4 +273,47 @@ class SpandexTest {
       "subs iterator has correct elements",
       it3.sameElements(List(a1, a2, b)))
   }
+  @Test
+  def testForeach(): Unit = {
+    var n = 0
+    Spandex.empty[Int].foreach(_ => n += 1)
+    assertEquals("empty foreach", 0, n)
+    Spandex(1).foreach(x => n += x)
+    assertEquals("single foreach", 1, n)
+    Spandex(2, 3, 4, 5, 6).foreach(x => n += x)
+    assertEquals("multiple foreach", 21, n)
+  }
+  @Test
+  def testIndexWhere(): Unit = {
+    assertEquals("empty index where", -1, Spandex.empty[Int].indexWhere(_ => true))
+    assertEquals("single index where exists", 0, Spandex(1).indexWhere(x => x == 1))
+    assertEquals("single index where not exists", -1, Spandex(1).indexWhere(x => x == 2))
+    assertEquals("multiple index where exists", 1, Spandex(1, 2, 3, 4).indexWhere(x => x % 2 == 0))
+    assertEquals("multiple index where not exists", -1, Spandex(1, 2, 3, 4).indexWhere(x => x == 5))
+  }
+  @Test
+  def testFoldLeft(): Unit = {
+    assertEquals("empty fold left", 0, Spandex.empty[Int].foldLeft(0) {
+      case (acc, x) => acc - x
+    })
+    assertEquals("single fold left", -1, Spandex(1).foldLeft(0) {
+      case (acc, x) => acc - x
+    })
+    assertEquals("multiple fold left", -10, Spandex(1, 2, 3, 4).foldLeft(0) {
+      case (acc, x) => acc - x
+    })
+  }
+  @Test
+  def testFoldRight(): Unit = {
+    assertEquals("empty fold right", 0, Spandex.empty[Int].foldRight(0) {
+      case (x, acc) => x - acc
+    })
+    assertEquals("single fold right", 1, Spandex(1).foldRight(0) {
+      case (x, acc) => x - acc
+    })
+    assertEquals("multiple fold right", -2, Spandex(1, 2, 3, 4).foldRight(0) {
+      case (x, acc) => x - acc
+    })
+  }
+
 }
