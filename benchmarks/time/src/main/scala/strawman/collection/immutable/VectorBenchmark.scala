@@ -49,6 +49,17 @@ class VectorBenchmark {
   }
 
   @Benchmark
+  def foreach_while(): Any = {
+    var n = 0
+    var ys = xs
+    while (ys.nonEmpty) {
+      if (ys.head eq null) n += 1
+      ys = ys.tail
+    }
+    n
+  }
+
+  @Benchmark
   def iterator(): Any = {
     var n = 0
     val it = xs.iterator
@@ -64,4 +75,18 @@ class VectorBenchmark {
 
   @Benchmark
   def reverse(): Any = xs.reverse
+
+  @Benchmark
+  def foldLeft(): Any = xs.foldLeft(0) {
+    case (acc, n) =>
+      if (n eq null) acc + 1
+      else acc
+  }
+
+  @Benchmark
+  def foldRight(): Any = xs.foldRight(0) {
+    case (n, acc) =>
+      if (n eq null) acc - 1
+      else acc
+  }
 }

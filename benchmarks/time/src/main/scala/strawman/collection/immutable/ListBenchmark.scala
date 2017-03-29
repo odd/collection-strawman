@@ -77,4 +77,18 @@ class ListBenchmark {
 
   @Benchmark
   def reverse(): Any = xs.reverse
+
+  @Benchmark
+  def foldLeft(): Any = xs.foldLeft(0) {
+    case (acc, n) =>
+      if (n eq null) acc + 1
+      else acc
+  }
+
+  @Benchmark
+  def foldRight(): Any = xs.foldRight(0) {
+    case (n, acc) =>
+      if (n eq null) acc - 1
+      else acc
+  }
 }

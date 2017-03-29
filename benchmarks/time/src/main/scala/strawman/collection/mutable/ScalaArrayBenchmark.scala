@@ -50,6 +50,17 @@ class ScalaArrayBenchmark {
   }
 
   @Benchmark
+  def foreach_while(): Any = {
+    var n = 0
+    var ys = xs
+    while (ys.nonEmpty) {
+      if (ys.head eq null) n += 1
+      ys = ys.tail
+    }
+    n
+  }
+
+  @Benchmark
   def iterator(): Any = {
     var n = 0
     val it = xs.iterator
@@ -65,4 +76,18 @@ class ScalaArrayBenchmark {
 
   @Benchmark
   def reverse(): Any = xs.reverse
+
+  @Benchmark
+  def foldLeft(): Any = xs.foldLeft(0) {
+    case (acc, x) =>
+      if (x eq null) acc + 2
+      else acc - 1
+  }
+
+  @Benchmark
+  def foldRight(): Any = xs.foldRight(0) {
+    case (x, acc) =>
+      if (x eq null) acc - 2
+      else acc + 1
+  }
 }
