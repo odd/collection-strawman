@@ -42,7 +42,9 @@ object MemoryFootprint extends App {
       "LazyList"    -> benchmark(LazyList.fill(_)(obj)),
       "ArrayBuffer" -> benchmark(ArrayBuffer.fill(_)(obj)),
       "ListBuffer"  -> benchmark(ListBuffer.fill(_)(obj)),
-      "Spandex"     -> benchmark(Spandex.fill(_)(obj))
+      "Spandex"     -> benchmark(Spandex.fill(_)(obj)),
+      "Vector"      -> benchmark(scala.Vector.fill(_)(obj)),
+      "scala.Array" -> benchmark(scala.Array.fill(_)(obj))
     )
 
   // We use a format similar to the one used by JMH so that

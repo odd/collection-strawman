@@ -1,9 +1,9 @@
 package strawman.collection.mutable
 
 import java.util.concurrent.TimeUnit
-
 import org.openjdk.jmh.annotations._
 import scala.{Any, AnyRef, Int, Unit}
+import org.openjdk.jmh.infra.Blackhole
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -13,7 +13,7 @@ import scala.{Any, AnyRef, Int, Unit}
 @State(Scope.Benchmark)
 class ListBufferBenchmark {
 
-  @Param(scala.Array("8", "64", "512", "4096", "32768", "262144"/*, "2097152"*/))
+  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "262144"))
   var size: Int = _
 
   var xs: ListBuffer[AnyRef] = _
@@ -26,68 +26,79 @@ class ListBufferBenchmark {
   }
 
   @Benchmark
-  def cons(): Any = {
+  def cons(bh: Blackhole): Any = {
     var ys = ListBuffer.empty[Any]
     var i = 0
     while (i < size) {
       ys += obj
       i += 1
     }
-    ys
+    bh.consume(ys)
+    bh.consume(i)
   }
 
   @Benchmark
-  def uncons(): Any = xs.tail
+  def uncons(bh: Blackhole): Any = bh.consume(xs.tail)
 
   @Benchmark
-  def concat(): Any = xs ++ xs
+  def concat(bh: Blackhole): Any = bh.consume(xs ++ xs)
 
   @Benchmark
-  def foreach(): Any = {
+  def foreach(bh: Blackhole): Any = {
     var n = 0
-    xs.foreach(x => if (x eq null) n += 1)
-    n
+    xs.foreach { x =>
+      bh.consume(x)
+      n += 1
+    }
+    bh.consume(n)
   }
 
   @Benchmark
-  def foreach_while(): Any = {
+  def foreach_while(bh: Blackhole): Any = {
     var n = 0
     var ys = xs
     while (ys.nonEmpty) {
-      if (ys.head eq null) n += 1
+      bh.consume(ys.head)
+      n += 1
       ys = ys.tail
     }
-    n
+    bh.consume(n)
   }
 
   @Benchmark
-  def iterator(): Any = {
+  def iterator(bh: Blackhole): Any = {
     var n = 0
     val it = xs.iterator()
-    while (it.hasNext) if (it.next() eq null) n += 1
-    n
+    while (it.hasNext) {
+      bh.consume(it.next())
+      n += 1
+    }
+    bh.consume(n)
   }
 
   @Benchmark
-  def lookup(): Any = xs(size - 1)
+  def lookup(bh: Blackhole): Any = bh.consume(xs(size - 1))
 
   @Benchmark
-  def map(): Any = xs.map(x => if (x eq null) "foo" else "bar")
+  def map(bh: Blackhole): Any = xs.map { x =>
+    bh.consume(x)
+    if (x eq null) "foo" else "bar"
+  }
 
   @Benchmark
-  def reverse(): Any = xs.reverse
+  def reverse(bh: Blackhole): Any = bh.consume(xs.reverse)
 
   @Benchmark
-  def foldLeft(): Any = xs.foldLeft(0) {
+  def foldLeft(bh: Blackhole): Any = bh.consume(xs.foldLeft(0) {
     case (acc, n) =>
-      if (n eq null) acc + 1
-      else acc
-  }
+      bh.consume(n)
+      acc + 1
+  })
 
   @Benchmark
-  def foldRight(): Any = xs.foldRight(0) {
+  def foldRight(bh: Blackhole): Any = bh.consume(xs.foldRight(0) {
     case (n, acc) =>
-      if (n eq null) acc - 1
-      else acc
-  }
+      bh.consume(n)
+      acc - 1
+  })
 }
