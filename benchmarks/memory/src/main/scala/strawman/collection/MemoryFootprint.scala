@@ -1,13 +1,11 @@
 package bench
 
-import strawman.collection.immutable.{LazyList, List, Spandex}
-
+import strawman.collection.immutable.{LazyList, List, Spandex_AtomicIntegerArray, Spandex_AtomicIntegers, Spandex_AtomicLong, Spandex_Synchronize}
 import scala.{Any, AnyRef, App, Int, Long, Seq, StringContext}
 import scala.Predef.{ArrowAssoc, println}
 import scala.compat.Platform
 import java.lang.Runtime
 import java.nio.file.{Files, Paths}
-
 import strawman.collection.mutable.{ArrayBuffer, ListBuffer}
 
 object MemoryFootprint extends App {
@@ -37,14 +35,17 @@ object MemoryFootprint extends App {
 
   val memories =
     scala.Predef.Map(
-      "scala.List"  -> benchmark(scala.List.fill(_)(obj)),
-      "List"        -> benchmark(List.fill(_)(obj)),
-      "LazyList"    -> benchmark(LazyList.fill(_)(obj)),
-      "ArrayBuffer" -> benchmark(ArrayBuffer.fill(_)(obj)),
-      "ListBuffer"  -> benchmark(ListBuffer.fill(_)(obj)),
-      "Spandex"     -> benchmark(Spandex.fill(_)(obj)),
-      "Vector"      -> benchmark(scala.Vector.fill(_)(obj)),
-      "scala.Array" -> benchmark(scala.Array.fill(_)(obj))
+      "scala.List"                  -> benchmark(scala.List.fill(_)(obj)),
+      "List"                        -> benchmark(List.fill(_)(obj)),
+      "LazyList"                    -> benchmark(LazyList.fill(_)(obj)),
+      "ArrayBuffer"                 -> benchmark(ArrayBuffer.fill(_)(obj)),
+      "ListBuffer"                  -> benchmark(ListBuffer.fill(_)(obj)),
+      "Spandex_AtomicIntegerArray"  -> benchmark(Spandex_AtomicIntegerArray.fill(_)(obj)),
+      "Spandex_AtomicIntegers"      -> benchmark(Spandex_AtomicIntegers.fill(_)(obj)),
+      "Spandex_AtomicLong"          -> benchmark(Spandex_AtomicLong.fill(_)(obj)),
+      "Spandex_Synchronize"         -> benchmark(Spandex_Synchronize.fill(_)(obj)),
+      "Vector"                      -> benchmark(scala.Vector.fill(_)(obj)),
+      "scala.Array"                 -> benchmark(scala.Array.fill(_)(obj))
     )
 
   // We use a format similar to the one used by JMH so that

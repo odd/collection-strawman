@@ -1,6 +1,7 @@
 package strawman.collection.immutable
 
-import scala.{Any, AnyRef, Unit, Array, ArrayIndexOutOfBoundsException, Boolean, Float, Int, None, Nothing, Option, Some, StringContext, volatile}
+import java.util.concurrent.atomic.{AtomicIntegerArray, AtomicLong}
+import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, Float, Int, Long, None, Nothing, Option, Some, StringContext, Unit, volatile}
 import scala.Predef.{???, String, identity, println}
 import scala.math
 import scala.reflect.ClassTag
@@ -9,7 +10,7 @@ import strawman.collection.{BuildFrom, IterableFactory, IterableOnce, Iterator, 
 import strawman.collection.mutable.{ArrayBuffer, Builder}
 
 /**
-  * A <i>Spandex</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
+  * A <i>SpandexIA</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
   * <ul>
   * <li>constant time <code>head</code>, <code>last</code>, <code>tail</code>, <code>init</code>, <code>take</code>, <code>drop</code> and <code>reverse</code> (<code>last</code> and <code>init</code> are not included in this implementation however)</li>
   * <li>amortised constant time <code>prepend</code> and <code>append</code> (depending on the complexity of <code>scala.Array.copy</code>)</li>
@@ -23,15 +24,15 @@ import strawman.collection.mutable.{ArrayBuffer, Builder}
   * <br/>
   * Expansion occurs when the underlying array is full on the effected side; the new array will be populated to have its center position adjusted by the unused capacity (margin) on the non effected side according to the following formula: <code>starting position = (length + margin) / 2</code> (i.e. for a six element spandex with two slots unused at the end <code>[a, b, c, d, e, f, , ]</code>, a prepend operation would make the expanded array have a length of 12 and a starting position of <code>(6 + 2) / 2 = 4</code>, <code>[ , , , , a, b, c, d, e, f, , ]</code>). This expansion scheme leads to more free slots being allocated on the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides).
   */
-sealed abstract class Spandex[+A]
+sealed abstract class Spandex_AtomicIntegerArray[+A]
   extends Seq[A]
-    with SeqLike[A, Spandex]
+    with SeqLike[A, Spandex_AtomicIntegerArray]
     with LinearSeq[A]
-    with MonoBuildable[A, Spandex[A]]
-    with PolyBuildable[A, Spandex] {
+    with MonoBuildable[A, Spandex_AtomicIntegerArray[A]]
+    with PolyBuildable[A, Spandex_AtomicIntegerArray] {
   protected def index: Int
   protected def array: scala.Array[Any]
-  protected def primary: Spandex.Primary[A]
+  protected def primary: Spandex_AtomicIntegerArray.Primary[A]
 
   override def size: Int = length
   override def knownSize: Int = length
@@ -50,61 +51,61 @@ sealed abstract class Spandex[+A]
 
   override def head: A = apply(0)
 
-  override def tail: Spandex[A] =
-    if (length > 0) new Spandex.Secondary[A](primary, shift(1), length - 1)
+  override def tail: Spandex_AtomicIntegerArray[A] =
+    if (length > 0) new Spandex_AtomicIntegerArray.Secondary[A](primary, shift(1), length - 1)
     else ???
 
-  def +:[B >: A](b: B): Spandex[B]
+  def +:[B >: A](b: B): Spandex_AtomicIntegerArray[B]
 
-  def :+[B >: A](b: B): Spandex[B]
+  def :+[B >: A](b: B): Spandex_AtomicIntegerArray[B]
 
-  override def ++[B >: A](xs: IterableOnce[B]): Spandex[B] = xs match {
-    case that: Spandex[B] if that.isEmpty => this
-    case that: Spandex.Secondary[B] if that.reversed => fromIterable(View.Concat(coll, xs))
-    case that: Spandex[B] =>
+  override def ++[B >: A](xs: IterableOnce[B]): Spandex_AtomicIntegerArray[B] = xs match {
+    case that: Spandex_AtomicIntegerArray[B] if that.isEmpty => this
+    case that: Spandex_AtomicIntegerArray.Secondary[B] if that.reversed => fromIterable(View.Concat(coll, xs))
+    case that: Spandex_AtomicIntegerArray[B] =>
       val size = this.size + that.size
       val array = new Array[Any](size * 2)
       val index = size / 2
       Array.copy(this.array, this.index, array, index, this.size)
       Array.copy(that.array, that.index, array, this.size + index, that.size)
-      new Spandex.Primary[A](index, size, array)
+      new Spandex_AtomicIntegerArray.Primary[A](index, size, array)
     case _ => fromIterable(View.Concat(coll, xs))
   }
 
-  override def zip[B](xs: IterableOnce[B]): Spandex[(A, B)] = xs match {
-    case that: Spandex[B] =>
-      Spandex.tabulate(math.min(this.length, that.length)) { i =>
+  override def zip[B](xs: IterableOnce[B]): Spandex_AtomicIntegerArray[(A, B)] = xs match {
+    case that: Spandex_AtomicIntegerArray[B] =>
+      Spandex_AtomicIntegerArray.tabulate(math.min(this.length, that.length)) { i =>
         (this.apply(i), that.apply(i))
       }
     case _ => fromIterable[(A, B)](View.Zip[A, B](coll, xs))
   }
 
-  override def filter(p: A => Boolean): Spandex[A] =
+  override def filter(p: A => Boolean): Spandex_AtomicIntegerArray[A] =
     fromIterable[A](View.Filter[A](coll, p))
 
-  override def map[B](f: A => B): Spandex[B] =
-    Spandex.tabulate(length)(i => f(fetch(i)))
+  override def map[B](f: A => B): Spandex_AtomicIntegerArray[B] =
+    Spandex_AtomicIntegerArray.tabulate(length)(i => f(fetch(i)))
 
-  override def flatMap[B](f: A => IterableOnce[B]): Spandex[B] =
+  override def flatMap[B](f: A => IterableOnce[B]): Spandex_AtomicIntegerArray[B] =
     fromIterable[B](View.FlatMap[A, B](coll, f))
 
-  override def partition(p: A => Boolean): (Spandex[A], Spandex[A]) = {
+  override def partition(p: A => Boolean): (Spandex_AtomicIntegerArray[A], Spandex_AtomicIntegerArray[A]) = {
     val pn = View.Partition(coll, p)
     (fromIterable(pn.left), fromIterable(pn.right))
   }
 
-  override def take(n: Int): Spandex[A] =
-    new Spandex.Secondary[A](primary, index, math.min(n, length))
+  override def take(n: Int): Spandex_AtomicIntegerArray[A] =
+    new Spandex_AtomicIntegerArray.Secondary[A](primary, index, math.min(n, length))
 
-  override def drop(n: Int): Spandex[A] =
-    new Spandex.Secondary[A](primary, shift(math.min(n, length)), math.max(0, length - n))
+  override def drop(n: Int): Spandex_AtomicIntegerArray[A] =
+    new Spandex_AtomicIntegerArray.Secondary[A](primary, shift(math.min(n, length)), math.max(0, length - n))
 
-  override def reverse: Spandex[A] =
-    new Spandex.Secondary[A](primary, index, length, true)
+  override def reverse: Spandex_AtomicIntegerArray[A] =
+    new Spandex_AtomicIntegerArray.Secondary[A](primary, index, length, true)
 
   override def iterator(): Iterator[A] = new Iterator[A] {
     private[this] var i = 0
-    override def hasNext: Boolean = i < Spandex.this.length
+    override def hasNext: Boolean = i < Spandex_AtomicIntegerArray.this.length
     override def next(): A = {
       i += 1
       fetch(i - 1)
@@ -149,72 +150,68 @@ sealed abstract class Spandex[+A]
     xs
   }
 
-  def fromIterable[B](c: collection.Iterable[B]): Spandex[B] =
-    Spandex.fromIterable(c)
+  def fromIterable[B](c: collection.Iterable[B]): Spandex_AtomicIntegerArray[B] =
+    Spandex_AtomicIntegerArray.fromIterable(c)
 
-  override def className = "Spandex"
+  override def className = "SpandexIA"
 
-  override protected[this] def newBuilderWithSameElemType: Builder[A, Spandex[A]] = Spandex.newBuilder
+  override protected[this] def newBuilderWithSameElemType: Builder[A, Spandex_AtomicIntegerArray[A]] = Spandex_AtomicIntegerArray.newBuilder
 
-  override def newBuilder[E]: Builder[E, Spandex[E]] = Spandex.newBuilder
+  override def newBuilder[E]: Builder[E, Spandex_AtomicIntegerArray[E]] = Spandex_AtomicIntegerArray.newBuilder
 }
 
-object Spandex extends IterableFactory[Spandex] {
+object Spandex_AtomicIntegerArray extends IterableFactory[Spandex_AtomicIntegerArray] {
   private[immutable] class Primary[+A](
-      override val index: Int,
-      override val length: Int,
-      val array: scala.Array[Any])
-      extends Spandex[A] {
-    @volatile var low: Int = index
-    @volatile var high: Int = index + length - 1
+    override val index: Int,
+    override val length: Int,
+    val array: scala.Array[Any])
+    extends Spandex_AtomicIntegerArray[A] {
+
+    private[this] val bounds = new AtomicIntegerArray(Array[Int](index, index + length - 1))
+    private[Spandex_AtomicIntegerArray] def lower[B >: A](b: B, i: Int, l: Int): Boolean = {
+      val low = bounds.get(0)
+      if (low > 0 && low == i && bounds.compareAndSet(0, low, low - 1)) {
+        array(low - 1) = b
+        true
+      } else false
+    }
+    private[Spandex_AtomicIntegerArray] def raise[B >: A](b: B, i: Int, l: Int): Boolean = {
+      val high = bounds.get(1)
+      if (high < array.length - 1 && high == (i + l - 1) && bounds.compareAndSet(1, high, high + 1)) {
+        array(high + 1) = b
+        true
+      } else false
+    }
     override protected val primary: Primary[A] = this
 
-    override def +:[B >: A](b: B): Spandex[B] = {
+    override def +:[B >: A](b: B): Spandex_AtomicIntegerArray[B] = {
       if (lower(b, index, length)) new Secondary[B](this, index - 1, length + 1)
-      else b +: Spandex[A](index, length, array)
+      else b +: Spandex_AtomicIntegerArray[A](index, length, array)
     }
-    override def :+[B >: A](b: B): Spandex[B] = {
+    override def :+[B >: A](b: B): Spandex_AtomicIntegerArray[B] = {
       if (raise(b, index, length)) new Secondary[B](this, index, length + 1)
-      else Spandex[A](index, length, array) :+ b
-    }
-    private[Spandex] def lower[B >: A](b: B, i: Int, l: Int): Boolean = {
-      this.synchronized {
-        if (low > 0 && low == i) {
-          low -= 1
-          array(low) = b
-          true
-        } else false
-      }
-    }
-    private[Spandex] def raise[B >: A](b: B, i: Int, l: Int): Boolean = {
-      this.synchronized {
-        if (high < array.length - 1 && high == (i + l - 1)) {
-          high += 1
-          array(high) = b
-          true
-        } else false
-      }
+      else Spandex_AtomicIntegerArray[A](index, length, array) :+ b
     }
   }
 
   private[immutable] final object Empty extends Primary[Nothing](0, 0, Array.empty) {
-    override def +:[B >: Nothing](b: B): Spandex[B] = Spandex(b)
-    override def :+[B >: Nothing](b: B): Spandex[B] = Spandex(b)
-    override def ++[B >: Nothing](xs: IterableOnce[B]): Spandex[B] = xs match {
-      case that: Spandex[B] => that
+    override def +:[B >: Nothing](b: B): Spandex_AtomicIntegerArray[B] = Spandex_AtomicIntegerArray(b)
+    override def :+[B >: Nothing](b: B): Spandex_AtomicIntegerArray[B] = Spandex_AtomicIntegerArray(b)
+    override def ++[B >: Nothing](xs: IterableOnce[B]): Spandex_AtomicIntegerArray[B] = xs match {
+      case that: Spandex_AtomicIntegerArray[B] => that
       case _ =>
-        val builder = Spandex.newBuilder[B]
+        val builder = Spandex_AtomicIntegerArray.newBuilder[B]
         builder ++= xs
-        Spandex.fromIterable(builder.result)
+        Spandex_AtomicIntegerArray.fromIterable(builder.result)
     }
   }
 
   private[immutable] final class Secondary[+A](
-      override val primary: Primary[A],
-      override val index: Int,
-      override val length: Int,
-      val reversed: Boolean = false)
-      extends Spandex[A] {
+    override val primary: Primary[A],
+    override val index: Int,
+    override val length: Int,
+    val reversed: Boolean = false)
+    extends Spandex_AtomicIntegerArray[A] {
     override protected def array: Array[Any] = primary.array
 
     override protected def shift(i: Int): Int =
@@ -224,33 +221,33 @@ object Spandex extends IterableFactory[Spandex] {
     override def reverse =
       new Secondary[A](primary, index, length, !reversed)
 
-    override def +:[B >: A](b: B): Spandex[B] =
+    override def +:[B >: A](b: B): Spandex_AtomicIntegerArray[B] =
       if (reversed && primary.raise(b, index, length)
-          || !reversed && primary.lower(b, index, length))
+        || !reversed && primary.lower(b, index, length))
         new Secondary[B](primary, index - 1, length + 1, reversed)
-      else if (!reversed) b +: Spandex[A](index, length, array)
+      else if (!reversed) b +: Spandex_AtomicIntegerArray[A](index, length, array)
       else tabulate(length + 1, upperMargin) {
         case k if k == 0 ⇒ b
         case k ⇒ fetch(k - 1)
       }
 
-    override def :+[B >: A](b: B): Spandex[B] =
+    override def :+[B >: A](b: B): Spandex_AtomicIntegerArray[B] =
       if (reversed && primary.lower(b, index, length)
-          || !reversed && primary.raise(b, index, length))
+        || !reversed && primary.raise(b, index, length))
         new Secondary[B](primary, index, length + 1, reversed)
-      else if (!reversed) Spandex[A](index, length, array) :+ b
+      else if (!reversed) Spandex_AtomicIntegerArray[A](index, length, array) :+ b
       else tabulate(length + 1, -lowerMargin) {
         case k if k == length ⇒ b
         case k ⇒ fetch(k)
       }
 
-    /* Don't use optimized implementation from Spandex if this is reversed since array copy won't work for reversees */
-    override def ++[B >: A](xs: IterableOnce[B]): Spandex[B] = {
+    /* Don't use optimized implementation from SpandexIA if this is reversed since array copy won't work for reversees */
+    override def ++[B >: A](xs: IterableOnce[B]): Spandex_AtomicIntegerArray[B] = {
       if (reversed) fromIterable(View.Concat(coll, xs))
       else super.++(xs)
     }
 
-    /* Don't use optimized implementation from Spandex if this is reversed since array copy won't work for reversees */
+    /* Don't use optimized implementation from SpandexIA if this is reversed since array copy won't work for reversees */
     override def copyToArray[B >: A](xs: Array[B], start: Int): xs.type =
       if (reversed) {
         var i = start
@@ -263,14 +260,14 @@ object Spandex extends IterableFactory[Spandex] {
       } else super.copyToArray(xs, start)
   }
 
-  override def apply[A](xs: A*): Spandex[A] =
+  override def apply[A](xs: A*): Spandex_AtomicIntegerArray[A] =
     apply(0, xs.length, xs.toArray[Any])
 
-  def apply[A](it: Iterable[A]): Spandex[A] =
+  def apply[A](it: Iterable[A]): Spandex_AtomicIntegerArray[A] =
     fromIterable(it)
 
-  private[Spandex] def apply[A](i: Int, n: Int, xs: Array[Any]): Spandex[A] = {
-    if (n == 0) Spandex.Empty
+  private[Spandex_AtomicIntegerArray] def apply[A](i: Int, n: Int, xs: Array[Any]): Spandex_AtomicIntegerArray[A] = {
+    if (n == 0) Spandex_AtomicIntegerArray.Empty
     else {
       val capacity = math.max(n * 2, 8)
       val array = new Array[Any](capacity)
@@ -280,11 +277,11 @@ object Spandex extends IterableFactory[Spandex] {
     }
   }
 
-  def tabulate[A](n: Int)(f: Int => A): Spandex[A] =
+  def tabulate[A](n: Int)(f: Int => A): Spandex_AtomicIntegerArray[A] =
     tabulate(n, 0)(f)
 
-  private[Spandex] def tabulate[A](n: Int, margin: Int)(f: Int => A): Spandex[A] =
-    if (n == 0) Spandex.Empty
+  private[Spandex_AtomicIntegerArray] def tabulate[A](n: Int, margin: Int)(f: Int => A): Spandex_AtomicIntegerArray[A] =
+    if (n == 0) Spandex_AtomicIntegerArray.Empty
     else {
       val capacity = math.max(n * 2, 8)
       val array = scala.Array.ofDim[Any](capacity)
@@ -298,17 +295,17 @@ object Spandex extends IterableFactory[Spandex] {
       new Primary[A](first, n, array)
     }
 
-  override def fill[A](n: Int)(elem: => A): Spandex[A] =
+  override def fill[A](n: Int)(elem: => A): Spandex_AtomicIntegerArray[A] =
     tabulate(n)(_ => elem)
 
-  def fromIterable[A](it: collection.Iterable[A]): Spandex[A] = it match {
-    case that: Spandex[A] ⇒ that
-    case c if c.isEmpty => Spandex.Empty
+  def fromIterable[A](it: collection.Iterable[A]): Spandex_AtomicIntegerArray[A] = it match {
+    case that: Spandex_AtomicIntegerArray[A] ⇒ that
+    case c if c.isEmpty => Spandex_AtomicIntegerArray.Empty
     case _ ⇒
       val array = ArrayBuffer.fromIterable(it).asInstanceOf[ArrayBuffer[Any]].toArray
       apply(0, array.length, array)
   }
 
-  override def newBuilder[A]: Builder[A, Spandex[A]] =
-    new ArrayBuffer[A].mapResult(b => b.to(Spandex))
+  override def newBuilder[A]: Builder[A, Spandex_AtomicIntegerArray[A]] =
+    new ArrayBuffer[A].mapResult(b => b.to(Spandex_AtomicIntegerArray))
 }

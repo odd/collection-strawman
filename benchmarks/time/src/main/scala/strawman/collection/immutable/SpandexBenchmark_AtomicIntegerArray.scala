@@ -11,23 +11,23 @@ import org.openjdk.jmh.infra.Blackhole
 @Warmup(iterations = 12)
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
-class SpandexBenchmark {
+class SpandexBenchmark_AtomicIntegerArray {
 
   @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "262144"))
   var size: Int = _
 
-  var xs: Spandex[AnyRef] = _
+  var xs: Spandex_AtomicIntegerArray[AnyRef] = _
   var obj: Any = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    xs = Spandex.fill(size)("")
+    xs = Spandex_AtomicIntegerArray.fill(size)("")
     obj = ""
   }
 
   @Benchmark
   def cons(bh: Blackhole): Any = {
-    var ys = Spandex.empty[Any]
+    var ys = Spandex_AtomicIntegerArray.empty[Any]
     var i = 0
     while (i < size) {
       ys = obj +: ys
