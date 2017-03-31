@@ -1,6 +1,7 @@
 package strawman.collection.immutable
 
-import scala.{Any, AnyRef, Unit, Array, ArrayIndexOutOfBoundsException, Boolean, Float, Int, None, Nothing, Option, Some, StringContext, volatile}
+import java.util.concurrent.atomic.AtomicInteger
+import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, Float, Int, None, Nothing, Option, Some, StringContext, Unit, volatile}
 import scala.Predef.{???, String, identity, println}
 import scala.math
 import scala.reflect.ClassTag
@@ -165,8 +166,22 @@ object Spandex extends IterableFactory[Spandex] {
       override val length: Int,
       val array: scala.Array[Any])
       extends Spandex[A] {
-    @volatile var low: Int = index
-    @volatile var high: Int = index + length - 1
+    private[this] val low: AtomicInteger = new AtomicInteger(index)
+    private[this] val high: AtomicInteger = new AtomicInteger(index + length - 1)
+    private[Spandex] def lower[B >: A](b: B, i: Int, l: Int): Boolean = {
+      val lo = low.get
+      if (lo > 0 && lo == i && low.compareAndSet(lo, lo - 1)) {
+        array(lo - 1) = b
+        true
+      } else false
+    }
+    private[Spandex] def raise[B >: A](b: B, i: Int, l: Int): Boolean = {
+      val hi = high.get
+      if (hi < array.length - 1 && hi == (i + l - 1) && high.compareAndSet(hi, hi + 1)) {
+        array(hi + 1) = b
+        true
+      } else false
+    }
     override protected val primary: Primary[A] = this
 
     override def +:[B >: A](b: B): Spandex[B] = {
@@ -176,24 +191,6 @@ object Spandex extends IterableFactory[Spandex] {
     override def :+[B >: A](b: B): Spandex[B] = {
       if (raise(b, index, length)) new Secondary[B](this, index, length + 1)
       else Spandex[A](index, length, array) :+ b
-    }
-    private[Spandex] def lower[B >: A](b: B, i: Int, l: Int): Boolean = {
-      this.synchronized {
-        if (low > 0 && low == i) {
-          low -= 1
-          array(low) = b
-          true
-        } else false
-      }
-    }
-    private[Spandex] def raise[B >: A](b: B, i: Int, l: Int): Boolean = {
-      this.synchronized {
-        if (high < array.length - 1 && high == (i + l - 1)) {
-          high += 1
-          array(high) = b
-          true
-        } else false
-      }
     }
   }
 
