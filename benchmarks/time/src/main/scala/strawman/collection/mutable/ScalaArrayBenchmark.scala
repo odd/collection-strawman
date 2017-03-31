@@ -14,7 +14,7 @@ import org.openjdk.jmh.infra.Blackhole
 @State(Scope.Benchmark)
 class ScalaArrayBenchmark {
 
-  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "262144"))
+  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4094", "32911"/*, "73121", "262144"*/))
   var size: Int = _
 
   var xs: scala.Array[AnyRef] = _
