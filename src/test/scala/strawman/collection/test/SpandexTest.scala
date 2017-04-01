@@ -1,13 +1,11 @@
 package strawman
 package collection.test
 
-import java.lang.String
 import scala.{Any, Array, Boolean, Char, Either, Int, Left, Nothing, Option, StringContext, Unit}
 import scala.Predef.{assert, charWrapper, identity, println}
 
-import collection._
-import collection.immutable.{LazyList, List, Nil, Spandex}
-import collection.mutable.{ArrayBuffer, ListBuffer}
+import strawman.collection.immutable._
+import strawman.collection.mutable._
 import org.junit.Test
 import org.junit.Assert._
 
@@ -282,6 +280,9 @@ class SpandexTest {
     assertEquals("single foreach", 1, n)
     Spandex(2, 3, 4, 5, 6).foreach(x => n += x)
     assertEquals("multiple foreach", 21, n)
+    var m = 6
+    Spandex(1, 2, 3).reverse.foreach(x => m -= x)
+    assertEquals("multiple foreach reversed", 0, m)
   }
   @Test
   def testIndexWhere(): Unit = {
@@ -315,5 +316,10 @@ class SpandexTest {
       case (x, acc) => x - acc
     })
   }
-
+  @Test
+  def testFromIterable(): Unit = {
+    assertEquals("empty list is empty", Spandex.empty, Spandex.fromIterable(List.empty))
+    assertEquals("empty scala list is empty", Spandex.empty, Spandex.fromIterable(Nil))
+    assertEquals("empty lazy list is empty", Spandex.empty, Spandex.fromIterable[Int](LazyList.empty))
+  }
 }

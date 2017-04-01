@@ -8,12 +8,13 @@ import org.openjdk.jmh.infra.Blackhole
 @BenchmarkMode(scala.Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Fork(1)
+@Threads(Threads.MAX)
 @Warmup(iterations = 12)
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class ListBenchmark {
 
-  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4094", "32911"/*, "73121", "262144"*/))
+  @Param(scala.Array("1", "7", "17", "282", "7890", "32911", "73121", "262144"))
   var size: Int = _
 
   var xs: List[AnyRef] = _
@@ -77,7 +78,7 @@ class ListBenchmark {
   }
 
   @Benchmark
-  def lookup(bh: Blackhole): Any = bh.consume(xs(size - 1))
+  def lookup(bh: Blackhole): Any = if (xs.nonEmpty) bh.consume(xs(size - 1))
 
   @Benchmark
   def map(bh: Blackhole): Any = xs.map { x =>
