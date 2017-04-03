@@ -1,13 +1,8 @@
-package strawman
-package collection.test
+package strawman.collection.immutable
+package test
 
-import scala.{Any, Array, Boolean, Char, Either, Int, Left, Nothing, Option, StringContext, Unit}
-import scala.Predef.{assert, charWrapper, identity, println}
-
-import strawman.collection.immutable._
-import strawman.collection.mutable._
-import org.junit.Test
 import org.junit.Assert._
+import org.junit.Test
 
 class SpandexTest {
   @Test
@@ -110,6 +105,27 @@ class SpandexTest {
     assertEquals("append multiple", Spandex(1, 2, 3, 4, 5), Spandex(1, 2, 3) :+ 4 :+ 5)
   }
   @Test
+  def testPrependAndAppendEqual(): Unit = {
+    assertEquals("prepend equal on empty", Spandex(1), 1 +: (1 +: Spandex.empty).tail)
+    assertEquals("append equal on empty", Spandex(1), (Spandex.empty :+ 1).take(0) :+ 1)
+    assertEquals("prepend equal on single", Spandex(0, 1), 0 +: (0 +: Spandex(1)).tail)
+    assertEquals("append equal on single", Spandex(1, 2), (Spandex(1) :+ 2).take(1) :+ 2)
+    val a = Spandex(1, 2, 3)
+    val b = 0 +: a
+    val c = b.tail
+    val d = 0 +: c
+    val e = -1 +: b
+    val f = -2 +: d
+    assertEquals("prepend equal", Spandex(1, 2, 3), a)
+    assertEquals("prepend equal", Spandex(0, 1, 2, 3), b)
+    assertEquals("prepend equal", Spandex(1, 2, 3), c)
+    assertEquals("prepend equal", Spandex(0, 1, 2, 3), d)
+    assertTrue("prepend eq primaries", b.primary eq d.primary)
+    assertEquals("prepend equal", Spandex(-1, 0, 1, 2, 3), e)
+    assertEquals("prepend equal", Spandex(-2, 0, 1, 2, 3), f)
+
+  }
+  @Test
   def testConcat(): Unit = {
     assertEquals("concat empty with empty", Spandex.empty, Spandex.empty ++ Spandex.empty)
     assertEquals("concat empty with single", Spandex(1), Spandex.empty ++ Spandex(1))
@@ -210,6 +226,10 @@ class SpandexTest {
     val gr = er.tail.tail.tail
     assertEquals("large g", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), g)
     assertEquals("large g reversed", Spandex(8, 7, 6, 5, 4, 3, 2, 1, 0, -1, -2), gr)
+    val h = (g.tail ++ g.tail.tail.tail).tail
+    val h2 = (gr.tail.reverse ++ g.tail.reverse).tail.tail
+    assertEquals("large h", Spandex(3, 4, 5, 6, 7, 8, 9, 10, 11, 4, 5, 6, 7, 8, 9, 10, 11), h)
+    assertEquals("large h2", Spandex(0, 1, 2, 3, 4, 5, 6, 7, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2), h2)
 
     assertEquals("large a still", Spandex(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), a)
     assertEquals("large a reversed still", Spandex(9, 8, 7, 6, 5, 4, 3, 2, 1, 0), ar)
@@ -237,6 +257,10 @@ class SpandexTest {
     assertEquals("large f equals its reversed reverse still", f, fr.reverse)
     assertEquals("large g still", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), g)
     assertEquals("large g reversed still", Spandex(8, 7, 6, 5, 4, 3, 2, 1, 0, -1, -2), gr)
+    assertEquals("large h still", Spandex(3, 4, 5, 6, 7, 8, 9, 10, 11, 4, 5, 6, 7, 8, 9, 10, 11), h)
+    assertEquals("large h reversed still", Spandex(0, 1, 2, 3, 4, 5, 6, 7, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2), h2)
+    assertEquals("large h equals its reversed reverse", h, h.reverse.reverse)
+    assertEquals("large h2 equals its reversed reverse", h2, h2.reverse.reverse)
   }
   @Test
   def testIterator(): Unit = {
