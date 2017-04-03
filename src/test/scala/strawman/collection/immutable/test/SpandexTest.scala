@@ -4,6 +4,9 @@ package test
 import org.junit.Assert._
 import org.junit.Test
 
+import scala.{Unit, Int}
+import scala.Predef.identity
+
 class SpandexTest {
   @Test
   def testEmpty(): Unit = {
