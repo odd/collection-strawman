@@ -372,6 +372,16 @@ object Spandex extends IterableFactory[Spandex] {
       apply(array, 0, array.length)
   }
 
+  /**
+    * Used to wrap an existing array (without copying). Observe that later modifications to the specified array will show through to the returned instance.
+    * @param xs array to use for elements
+    * @tparam A the element type to use
+    * @return a new instance using the specified array as element storage (or the empty spandex if the array is empty).
+    */
+  private[strawman] def wrapArray[A](xs: Array[Any]): Spandex[A] =
+    if (xs.length == 0) Spandex.empty
+    else new Primary[A](xs, 0, xs.length)
+
   override def newBuilder[A]: Builder[A, Spandex[A]] =
     new ArrayBuffer[A].mapResult(b => b.to(Spandex))
 }
