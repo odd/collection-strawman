@@ -3,9 +3,9 @@ package test
 
 import org.junit.Assert._
 import org.junit.Test
-
-import scala.{Unit, Int}
+import scala.{Int, Unit}
 import scala.Predef.identity
+import strawman.collection.immutable
 
 class SpandexTest {
   @Test
@@ -348,5 +348,15 @@ class SpandexTest {
     assertEquals("empty list is empty", Spandex.empty, Spandex.fromIterable(List.empty))
     assertEquals("empty scala list is empty", Spandex.empty, Spandex.fromIterable(Nil))
     assertEquals("empty lazy list is empty", Spandex.empty, Spandex.fromIterable[Int](LazyList.empty))
+  }
+  @Test
+  def testTrim(): Unit = {
+    assertEquals("empty trimmed is empty", Spandex.empty, Spandex.fromIterable(List.empty).trim())
+    assertEquals("single trimmed has elements array of correct length", 1, Spandex(1).trim().asInstanceOf[Spandex.Primary[Int]].elements.length)
+    assertEquals("single trimmed has elements array with correct element", 1, Spandex(1).trim().asInstanceOf[Spandex.Primary[Int]].elements(0))
+    assertEquals("multiple trimmed has elements array of correct length", 3, Spandex(1, 2, 3).trim().asInstanceOf[Spandex.Primary[Int]].elements.length)
+    assertEquals("multiple trimmed has elements array with correct element", 1, Spandex(1, 2, 3).trim().asInstanceOf[Spandex.Primary[Int]].elements(0))
+    assertEquals("multiple trimmed has elements array with correct element", 2, Spandex(1, 2, 3).trim().asInstanceOf[Spandex.Primary[Int]].elements(1))
+    assertEquals("multiple trimmed has elements array with correct element", 3, Spandex(1, 2, 3).trim().asInstanceOf[Spandex.Primary[Int]].elements(2))
   }
 }

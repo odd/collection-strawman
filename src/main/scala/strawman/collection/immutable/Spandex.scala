@@ -58,6 +58,16 @@ sealed abstract class Spandex[+A](protected val index: Int, override val length:
       else new Spandex.Secondary[A](primary, index + 1, length - 1, reversed)
     else ???
 
+  final def trim(): Spandex[A] = {
+    if (length == 0) Spandex.Empty
+    else if (length == elements.length) Spandex.wrapArray(elements)
+    else {
+      val array = new Array[Any](length)
+      Array.copy(elements, index, array, 0, length)
+      new Spandex.Primary[A](array, 0, length)
+    }
+  }
+
   final def +:[B >: A](b: B): Spandex[B] =
     if (isEmpty) Spandex(b)
     else if (reversed && primary.raise(b, index, length)) new Spandex.Secondary[B](primary, index, length + 1, reversed)
@@ -350,7 +360,7 @@ object Spandex extends IterableFactory[Spandex] {
     case _ =>
       val builder = Spandex.newBuilder[A]
       builder ++= it
-      Spandex.fromIterable(builder.result)
+      builder.result
   }
   def fromIterable[A](it: collection.Iterable[A]): Spandex[A] = it match {
     case that: Spandex[A] ⇒ that
