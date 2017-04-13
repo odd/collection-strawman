@@ -6,7 +6,7 @@ import scala.Predef.{???, String, identity, println}
 import scala.math
 import scala.reflect.ClassTag
 import strawman.collection
-import strawman.collection.{IterableFactory, IterableOnce, Iterator, LinearSeq, MonoBuildable, PolyBuildable, SeqLike, View}
+import strawman.collection.{IterableFactory, IterableOnce, Iterator, LinearSeq, MonoBuildable, PolyBuildable, SeqLike, View, immutable}
 import strawman.collection.mutable.{ArrayBuffer, Builder}
 
 /**
@@ -319,6 +319,9 @@ object Spandex extends IterableFactory[Spandex] {
 
   override def apply[A](xs: A*): Spandex[A] =
     apply(xs.toArray[Any], 0, xs.length)
+
+  def apply[A](sx: Spandex[A]): Spandex[A] =
+    sx.trim()
 
   def apply[A](it: Iterable[A]): Spandex[A] =
     fromIterable(it)
