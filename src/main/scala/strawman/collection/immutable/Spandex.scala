@@ -89,7 +89,7 @@ sealed abstract class Spandex[+A](protected val index: Int, override val length:
       case k ⇒ fetch(k)
     } else Spandex[A](elements, index, length) :+ b
 
-  override final def ++[B >: A](xs: IterableOnce[B]): Spandex[B] = xs match {
+  override final def concat[B >: A](xs: IterableOnce[B]): Spandex[B] = xs match {
     case _ if this.isEmpty => Spandex.fromIterable(xs)
     case that: Iterable[B] if that.knownSize == 0 || that.isEmpty => this
     case _ if this.reversed => fromIterable(View.Concat(coll, xs))
