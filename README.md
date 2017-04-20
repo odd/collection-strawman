@@ -70,6 +70,7 @@ libraryDependencies += "ch.epfl.scala" %% "collection-strawman" % "0.2.0-SNAPSHO
 - [x] `indexWhere`
 - [x] `isDefinedAt`
 - [x] `isEmpty` / `nonEmpty`
+- [x] `keysIteratorFrom`
 - [x] `last`
 - [x] `lastKey`
 - [x] `mkString`
@@ -83,8 +84,10 @@ libraryDependencies += "ch.epfl.scala" %% "collection-strawman" % "0.2.0-SNAPSHO
 - [x] `empty`
 - [x] `filter` / `filterNot`
 - [ ] `groupBy`
+- [x] `intersect`
 - [x] `partition`
 - [x] `range`
+- [x] `rangeImpl`
 - [x] `splitAt`
 - [x] `tail`
 - [x] `take`
@@ -92,7 +95,7 @@ libraryDependencies += "ch.epfl.scala" %% "collection-strawman" % "0.2.0-SNAPSHO
 
 ### Transformations to collections that can have a different element type
 
-- [x] `++` / `concat`
+- [x] `++` / `concat` / `union`
 - [x] `flatMap`
 - [x] `map`
 - [x] `merged`
