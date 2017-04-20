@@ -2,10 +2,10 @@ package strawman
 
 package collection.immutable
 
-import strawman.collection.{IterableFactory, Iterator}
+import strawman.collection.{Hashing, IterableFactory, Iterator}
 import strawman.collection.mutable.{Builder, ImmutableSetBuilder}
 
-import scala.{Any, AnyRef, Array, Boolean, inline, Int, NoSuchElementException, Serializable, SerialVersionUID, sys, Unit}
+import scala.{Any, AnyRef, Array, Boolean, `inline`, Int, NoSuchElementException, SerialVersionUID, Serializable, Unit, sys}
 import scala.Predef.assert
 import java.lang.Integer
 
@@ -26,6 +26,7 @@ import java.lang.Integer
 sealed trait HashSet[A]
   extends Set[A]
     with SetLike[A, HashSet]
+    with Hashing[A]
     with Serializable {
 
   import HashSet.nullToEmpty
@@ -48,17 +49,6 @@ sealed trait HashSet[A]
   protected def updated0(key: A, hash: Int, level: Int): HashSet[A]
 
   protected def removed0(key: A, hash: Int, level: Int): HashSet[A]
-
-  protected def computeHash(key: A): Int = improve(elemHashCode(key))
-
-  protected final def improve(hcode: Int): Int = {
-    var h: Int = hcode + ~(hcode << 9)
-    h = h ^ (h >>> 14)
-    h = h + (h << 4)
-    h ^ (h >>> 10)
-  }
-
-  protected final def elemHashCode(elem: A): Int = elem.##
 
 }
 
@@ -166,7 +156,7 @@ object HashSet extends IterableFactory[HashSet] {
         }
       } else this
 
-    private def writeObject(out: java.io.ObjectOutputStream) {
+    private def writeObject(out: java.io.ObjectOutputStream): Unit = {
       // this cannot work - reading things in might produce different
       // hash codes and remove the collision. however this is never called
       // because no references to this class are ever handed out to client code
@@ -175,7 +165,7 @@ object HashSet extends IterableFactory[HashSet] {
       //out.writeObject(kvs)
     }
 
-    private def readObject(in: java.io.ObjectInputStream) {
+    private def readObject(in: java.io.ObjectInputStream): Unit = {
       sys.error("cannot deserialize an immutable.HashSet where all items have the same 32-bit hash code")
       //kvs = in.readObject().asInstanceOf[ListSet[A]]
       //hash = computeHash(kvs.)
@@ -342,6 +332,6 @@ object HashSet extends IterableFactory[HashSet] {
     * In many internal operations the empty set is represented as null for performance reasons. This method converts
     * null to the empty set for use in public methods
     */
-  @inline private def nullToEmpty[A](s: HashSet[A]): HashSet[A] = if (s eq null) empty[A] else s
+  @`inline` private def nullToEmpty[A](s: HashSet[A]): HashSet[A] = if (s eq null) empty[A] else s
 
 }
