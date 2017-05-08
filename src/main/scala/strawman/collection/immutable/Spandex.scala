@@ -6,7 +6,7 @@ import scala.Predef.{???, String, identity, println}
 import scala.math
 import scala.reflect.ClassTag
 import strawman.collection
-import strawman.collection.{IterableFactory, IterableOnce, Iterator, LinearSeq, MonoBuildable, PolyBuildable, SeqLike, View, immutable}
+import strawman.collection.{IterableFactory, IterableOnce, Iterator, LinearSeq, Buildable, View, immutable}
 import strawman.collection.mutable.{ArrayBuffer, Builder}
 
 /**
@@ -28,11 +28,10 @@ import strawman.collection.mutable.{ArrayBuffer, Builder}
   * of <code>(6 + 2) / 2 = 4</code>, <code>[ , , , , a, b, c, d, e, f, , ]</code>). This expansion scheme leads to more free slots being allocated on the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides).
   */
 sealed abstract class Spandex[+A](protected val index: Int, override val length: Int)
-  extends Seq[A]
-    with SeqLike[A, Spandex]
-    with LinearSeq[A]
-    with MonoBuildable[A, Spandex[A]]
-    with PolyBuildable[A, Spandex] {
+    extends Seq[A]
+       with LinearSeq[A]
+       with SeqOps[A, Spandex, Spandex[A]]
+       with Buildable[A, Spandex[A]] {
 
   private[immutable] def primary: Spandex.Primary[A]
   protected def reversed: Boolean
@@ -229,14 +228,16 @@ sealed abstract class Spandex[+A](protected val index: Int, override val length:
     }
   }
 
-  final def fromIterable[B](c: collection.Iterable[B]): Spandex[B] =
+  protected[this] final def fromIterable[B](c: collection.Iterable[B]): Spandex[B] =
     Spandex.fromIterable(c)
 
+  protected[this] final def fromSpecificIterable(coll: collection.Iterable[A]): Spandex[A] =
+    fromIterable(coll)
+
+  protected[this] final def newBuilder: Builder[A, Spandex[A]] =
+    Spandex.newBuilder[A]
+
   override final def className = "Spandex"
-
-  override final protected[this] def newBuilderWithSameElemType: Builder[A, Spandex[A]] = Spandex.newBuilder
-
-  override final def newBuilder[E]: Builder[E, Spandex[E]] = Spandex.newBuilder
 }
 
 object Spandex extends IterableFactory[Spandex] {
@@ -377,7 +378,7 @@ object Spandex extends IterableFactory[Spandex] {
     if (xs.length == 0) Spandex.empty
     else new Primary[A](xs, 0, xs.length)
 
-  override def newBuilder[A]: Builder[A, Spandex[A]] =
+  def newBuilder[A]: Builder[A, Spandex[A]] =
     new ArrayBuffer[A].mapResult(b => b.to(Spandex))
 
   override def empty[A <: Any]: Spandex[A] = Spandex.Empty
