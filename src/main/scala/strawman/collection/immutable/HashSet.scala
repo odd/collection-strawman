@@ -1,9 +1,9 @@
 package strawman
+package collection
+package immutable
 
-package collection.immutable
-
-import strawman.collection.{Hashing, IterableFactory, Iterator}
-import strawman.collection.mutable.{Builder, ImmutableSetBuilder}
+import mutable.Builder
+import Hashing.computeHash
 
 import scala.{Any, AnyRef, Array, Boolean, `inline`, Int, NoSuchElementException, SerialVersionUID, Serializable, Unit, sys}
 import scala.Predef.assert
@@ -25,20 +25,19 @@ import java.lang.Integer
 @SerialVersionUID(2L)
 sealed trait HashSet[A]
   extends Set[A]
-    with SetLike[A, HashSet]
-    with Hashing[A]
-    with Serializable {
+     with SetOps[A, HashSet, HashSet[A]]
+     with Serializable {
 
   import HashSet.nullToEmpty
 
-  def fromIterable[B](coll: collection.Iterable[B]): HashSet[B] = HashSet.fromIterable(coll)
-  protected[this] def fromIterableWithSameElemType(coll: collection.Iterable[A]): HashSet[A] = fromIterable(coll)
+  protected[this] def fromIterable[B](coll: collection.Iterable[B]): HashSet[B] = HashSet.fromIterable(coll)
+  protected[this] def fromSpecificIterable(coll: collection.Iterable[A]): HashSet[A] = fromIterable(coll)
 
   def contains(elem: A): Boolean = get0(elem, computeHash(elem), 0)
 
-  def add(elem: A): HashSet[A] = updated0(elem, computeHash(elem), 0)
+  def incl(elem: A): HashSet[A] = updated0(elem, computeHash(elem), 0)
 
-  def remove(elem: A): HashSet[A] = nullToEmpty(removed0(elem, computeHash(elem), 0))
+  def excl(elem: A): HashSet[A] = nullToEmpty(removed0(elem, computeHash(elem), 0))
 
   override def empty: HashSet[A] = HashSet.empty
 
@@ -57,10 +56,8 @@ object HashSet extends IterableFactory[HashSet] {
   def fromIterable[A](it: collection.Iterable[A]): HashSet[A] =
     it match {
       case hs: HashSet[A] => hs
-      case _ => newBuilder[A].++=(it).result
+      case _ => empty ++ it
     }
-
-  def newBuilder[A]: Builder[A, HashSet[A]] = new ImmutableSetBuilder[A, HashSet](empty[A])
 
   def empty[A <: Any]: HashSet[A] = EmptyHashSet.asInstanceOf[HashSet[A]]
 
