@@ -281,11 +281,13 @@ class SpandexTest {
       "large iterator has correct elements",
       it.sameElements(List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)))
 
+    /*
     val it2 = (Spandex(1, 2, 3) :+ "kalle").iterator()
     assertTrue("any has non empty iterator", it2.hasNext)
     assertTrue(
       "any iterator has correct elements",
       it2.sameElements(List(1, 2, 3, "kalle")))
+    */
 
     class A()
     class B() extends A()
@@ -364,25 +366,25 @@ class SpandexTest {
     val a = Spandex(1, 2, 3)
     val b = 1 +: a.tail
     val c = 0 +: a.tail
-    val d = "0" +: a.tail
-    val e = "0" +: d.tail
-    val f = "0" +: a.tail
-    assertSame("append equal single on init equals original", a.primary.elements, b.primary.elements)
-    assertNotSame("append equal single on init equals original", a.primary.elements, c.primary.elements)
-    assertSame("append equal single on init equals original", d.primary.elements, e.primary.elements)
-    assertNotSame("append equal single on init equals original", d.primary.elements, f.primary.elements)
+    val d = -1 +: a.tail
+    val e = -1 +: d.tail
+    val f = -1 +: a.tail
+    assertSame("prepend equal single on tail equals original", a.primary.elements, b.primary.elements)
+    assertNotSame("prepend non equal single on tail does not equal original", a.primary.elements, c.primary.elements)
+    assertSame("prepend equal single on tail equals original", d.primary.elements, e.primary.elements)
+    assertNotSame("prepend non equal single on tail does not equal original", d.primary.elements, f.primary.elements)
   }
   @Test
   def testAppendEqElement(): Unit = {
     val a = Spandex(1, 2, 3)
     val b = a.take(2) :+ 3
     val c = a.take(2) :+ 4
-    val d = a.take(2) :+ "3"
-    val e = d.take(2) :+ "3"
-    val f = a.take(2) :+ "3"
+    val d = a.take(2) :+ 5
+    val e = d.take(2) :+ 5
+    val f = a.take(2) :+ 5
     assertSame("append equal single on init equals original", a.primary.elements, b.primary.elements)
-    assertNotSame("append equal single on init equals original", a.primary.elements, c.primary.elements)
+    assertNotSame("append non equal single on init does not equal original", a.primary.elements, c.primary.elements)
     assertSame("append equal single on init equals original", d.primary.elements, e.primary.elements)
-    assertNotSame("append equal single on init equals original", d.primary.elements, f.primary.elements)
+    assertNotSame("append non equal single on init does not equal original", d.primary.elements, f.primary.elements)
   }
 }
