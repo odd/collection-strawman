@@ -3,7 +3,7 @@ package test
 
 import org.junit.Assert._
 import org.junit.Test
-import scala.{Int, Unit}
+import scala.{Int, Unit, Nothing}
 import scala.Predef.identity
 import strawman.collection.immutable
 
@@ -130,7 +130,7 @@ class SpandexTest {
   }
   @Test
   def testConcat(): Unit = {
-    assertEquals("concat empty with empty", Spandex.empty, Spandex.empty ++ Spandex.empty)
+    assertEquals("concat empty with empty", Spandex.empty, Spandex.empty[Nothing] ++ Spandex.empty) // Explicit type annotation needed to avoid dotty bug.
     assertEquals("concat empty with single", Spandex(1), Spandex.empty ++ Spandex(1))
     assertEquals("concat single with empty", Spandex(1), Spandex(1) ++ Spandex.empty)
     assertEquals("concat empty with multiple", Spandex(1, 2, 3), Spandex.empty ++ Spandex(1, 2, 3))
