@@ -290,6 +290,8 @@ class StrawmanTest {
     val ys15: Seq[(Int, Boolean)] = xs15
     val xs16 = xs.reverse
     val ys16: Seq[Int] = xs16
+    val ys17 = LazyList.empty ++ LazyList.empty
+    val ys18: LazyList[Nothing] = ys17
     println("-------")
     println(x1)
     println(x2)
@@ -369,7 +371,7 @@ class StrawmanTest {
     val x1 = xs.get("foo")
     val x2: Option[Int] = x1
     val xs1 = xs + ("foo", 1)
-//    val xs2: immutable.SortedMap[String, Int] = xs1
+    val xs2: immutable.SortedMap[String, Int] = xs1
     val xs3 = xs.map(kv => kv._1)
     // val xs4: immutable.Iterable[String] = xs3  // FIXME: does not work under dotty, we get a collection.Iterable
     val xs5 = xs.map ({ case (k, v) => (v, k) }: scala.PartialFunction[(String, Int), (Int, String)])
@@ -380,6 +382,8 @@ class StrawmanTest {
     val xs8: immutable.Map[Foo, Int] = xs7
     val xs9 = xs6.to(List).to(mutable.HashMap)
     val xs9t: mutable.HashMap[Int, String] = xs9
+    val xs10 = xs1 ++ xs2
+    val xs11: immutable.SortedMap[String, Int] = xs10
   }
 
   def bitSets(xs: immutable.BitSet, ys: BitSet, zs: Set[Int]): Unit = {
