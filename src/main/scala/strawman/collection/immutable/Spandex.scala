@@ -1,7 +1,7 @@
 package strawman.collection.immutable
 
 import java.util.concurrent.atomic.AtomicInteger
-import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, Equals, Float, Int, None, Nothing, Option, Some, StringContext, Unit, volatile}
+import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, IllegalArgumentException, Boolean, Equals, Float, Int, None, Nothing, Option, Some, StringContext, Unit, volatile}
 import scala.Predef.{???, String, identity, println}
 import scala.math
 import scala.reflect.ClassTag
@@ -44,7 +44,7 @@ sealed abstract class Spandex[+A](protected val index: Int, override val length:
   override final def nonEmpty: Boolean = !isEmpty
   protected final def element(i: Int): A = scala.runtime.ScalaRunTime.array_apply(elements, i).asInstanceOf[A]
   protected final def shift(i: Int): Int =
-    if (reversed) index + length - 1 - i
+    if (reversed) index + length - i - 1
     else index + i
   protected final def fetch(i: Int): A = element(shift(i))
 
@@ -59,6 +59,23 @@ sealed abstract class Spandex[+A](protected val index: Int, override val length:
       if (reversed) new Spandex.Secondary[A](primary, index, length - 1, reversed)
       else new Spandex.Secondary[A](primary, index + 1, length - 1, reversed)
     else ???
+
+  override final def last: A = apply(length - 1)
+
+  /*override*/ final def init: Spandex[A] =
+    if (length > 0)
+      if (reversed) new Spandex.Secondary[A](primary, index + 1, length - 1, reversed)
+      else new Spandex.Secondary[A](primary, index, length - 1, reversed)
+    else ???
+
+  override final def slice(from: Int, until: Int): Spandex[A] = {
+    if (until < from) throw new IllegalArgumentException("until index must be greater or equal to from index")
+    if (from < 0 || from >= length) throw new ArrayIndexOutOfBoundsException(from)
+    if (until < 0 || until > length) throw new ArrayIndexOutOfBoundsException(until)
+    if (reversed) new Spandex.Secondary[A](primary, index + length - until, until - from, reversed)
+    else new Spandex.Secondary[A](primary, shift(from), until - from, reversed)
+    //new Spandex.Secondary[A](primary, index + from, until - from, reversed)
+  }
 
   final def trim(): Spandex[A] = {
     if (length == 0) Spandex.Empty

@@ -387,4 +387,37 @@ class SpandexTest {
     assertSame("append equal single on init equals original", d.primary.elements, e.primary.elements)
     assertNotSame("append non equal single on init does not equal original", d.primary.elements, f.primary.elements)
   }
+
+  @Test
+  def testLast(): Unit = {
+    assertEquals("single last", 1, Spandex(1).last)
+    assertEquals("single reversed last", 1, Spandex(1).reverse.last)
+    assertEquals("multiple last", 3, Spandex(1, 2, 3).last)
+    assertEquals("multiple reversed last", 1, Spandex(1, 2, 3).reverse.last)
+  }
+
+  @Test
+  def testInit(): Unit = {
+    assertEquals("single init", Spandex.empty, Spandex(1).init)
+    assertEquals("single reversed init", Spandex.empty, Spandex(1).reverse.init)
+    assertEquals("multiple init", Spandex(1, 2), Spandex(1, 2, 3).init)
+    assertEquals("multiple reverse init", Spandex(3, 2), Spandex(1, 2, 3).reverse.init)
+  }
+
+  @Test
+  def testSlice(): Unit = {
+    assertEquals("empty slice of single is empty", Spandex.empty, Spandex(1).slice(0, 0))
+    assertEquals("empty slice of single reversed is empty", Spandex.empty, Spandex(1).reverse.slice(0, 0))
+    assertEquals("empty slice of multiple is empty", Spandex.empty, Spandex(1, 2, 3).slice(1, 1))
+    assertEquals("empty slice of multiple reversed is empty", Spandex.empty, Spandex(1, 2, 3).reverse.slice(1, 1))
+    assertEquals("single slice of single", Spandex(1), Spandex(1).slice(0, 1))
+    assertEquals("single slice of single reversed", Spandex(1), Spandex(1).slice(0, 1))
+    assertEquals("single slice of multiple", Spandex(3), Spandex(1, 2, 3).slice(2, 3))
+    assertEquals("single slice of multiple reversed", Spandex(1), Spandex(1, 2, 3).reverse.slice(2, 3))
+    assertEquals("multiple slice of multiple", Spandex(2, 3), Spandex(1, 2, 3).slice(1, 3))
+    assertEquals("multiple slice of multiple reversed", Spandex(2, 1), Spandex(1, 2, 3).reverse.slice(1, 3))
+    assertEquals("multiple slice of multiple reversed with prepended", Spandex(3, 2), (4 +: Spandex(1, 2, 3).reverse).slice(1, 3))
+    assertEquals("multiple slice of full", Spandex(1, 2, 3), Spandex(1, 2, 3).slice(0, 3))
+    assertEquals("multiple slice of full reversed", Spandex(3, 2, 1), Spandex(1, 2, 3).reverse.slice(0, 3))
+  }
 }
