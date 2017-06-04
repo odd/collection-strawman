@@ -20,7 +20,7 @@ class ImmutableArrayPrimitiveBenchmark {
   var size: Int = _
 
   var xs: ImmutableArray[Int] = _
-  var xss: scala.Array[ImmutableArray[Long]] = _
+  var xss: scala.Array[ImmutableArray[Int]] = _
   var randomIndices: scala.Array[Int] = _
 
   @Setup(Level.Trial)
