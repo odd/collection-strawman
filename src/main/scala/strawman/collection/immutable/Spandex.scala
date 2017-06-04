@@ -280,8 +280,10 @@ sealed abstract class Spandex[+A] private (protected val index: Int, lengthVecto
       xs
     }
 
-  protected[this] final def fromIterable[B](c: collection.Iterable[B]): Spandex[B] =
+  override protected[this] final def fromIterable[B](c: collection.Iterable[B]): Spandex[B] =
     Spandex.fromIterable(c)
+
+  override def iterableFactory: IterableFactory[Spandex] = Spandex
 
   protected[this] final def fromSpecificIterable(coll: collection.Iterable[A]): Spandex[A] =
     fromIterable(coll)

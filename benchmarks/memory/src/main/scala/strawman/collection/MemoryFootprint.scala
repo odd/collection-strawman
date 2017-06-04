@@ -1,6 +1,6 @@
 package bench
 
-import strawman.collection.immutable.{LazyList, List, Spandex}
+import strawman.collection.immutable.{LazyList, List, ImmutableArray, Spandex}
 
 import scala.{Any, AnyRef, App, Int, Long, Seq, StringContext}
 import scala.Predef.{ArrowAssoc, println, intWrapper}
@@ -37,19 +37,23 @@ object MemoryFootprint extends App {
 
   val memories =
     scala.Predef.Map(
-      "scala.List"    -> benchmark(scala.List.fill(_)(obj)),
-      "List"          -> benchmark(List.fill(_)(obj)),
-      "LazyList"      -> benchmark(LazyList.fill(_)(obj)),
-      "scala.HashSet" -> benchmark(n => scala.collection.immutable.HashSet((1 to n).map(_.toString): _*)),
-      "HashSet"       -> benchmark(n => strawman.collection.immutable.HashSet((1 to n).map(_.toString): _*)),
-      "scala.TreeSet" -> benchmark(n => scala.collection.immutable.TreeSet((1 to n).map(_.toString): _*)),
-      "TreeSet"       -> benchmark(n => strawman.collection.immutable.TreeSet((1 to n).map(_.toString): _*)),
-      "ArrayBuffer"   -> benchmark(ArrayBuffer.fill(_)(obj)),
-      "ListBuffer"    -> benchmark(ListBuffer.fill(_)(obj)),
-      "Spandex"       -> benchmark(Spandex.fill(_)(obj)),
-      "Vector"        -> benchmark(scala.Vector.fill(_)(obj)),
-      "ScalaList"     -> benchmark(scala.List.fill(_)(obj)),
-      "ScalaArray"    -> benchmark(scala.Array.fill(_)(obj))
+      "scala.List"                  -> benchmark(scala.List.fill(_)(obj)),
+      "List"                        -> benchmark(List.fill(_)(obj)),
+      "LazyList"                    -> benchmark(LazyList.fill(_)(obj)),
+      "scala.HashSet"               -> benchmark(n => scala.collection.immutable.HashSet((1 to n).map(_.toString): _*)),
+      "HashSet"                     -> benchmark(n => strawman.collection.immutable.HashSet((1 to n).map(_.toString): _*)),
+      "scala.TreeSet"               -> benchmark(n => scala.collection.immutable.TreeSet((1 to n).map(_.toString): _*)),
+      "TreeSet"                     -> benchmark(n => strawman.collection.immutable.TreeSet((1 to n).map(_.toString): _*)),
+      "ArrayBuffer"                 -> benchmark(ArrayBuffer.fill(_)(obj)),
+      "ListBuffer"                  -> benchmark(ListBuffer.fill(_)(obj)),
+      "ImmutableArray"              -> benchmark(strawman.collection.immutable.ImmutableArray.fill(_)(obj)),
+      "ImmutableArray (primitive)"  -> benchmark(strawman.collection.immutable.ImmutableArray.fill(_)(123)),
+      "scala.Array"                 -> benchmark(scala.Array.fill(_)(obj)),
+      "scala.Array (primitive)"     -> benchmark(scala.Array.fill(_)(obj)),
+      "scala.Vector"                -> benchmark(scala.Vector.fill(_)(obj)),
+      "scala.Vector (primitive)"    -> benchmark(scala.Vector.fill(_)(123)),
+      "Spandex"                     -> benchmark(Spandex.fill(_)(obj)),
+      "Spandex (primitive)"         -> benchmark(Spandex.fill(_)(123))
     )
 
   // We use a format similar to the one used by JMH so that
