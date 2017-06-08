@@ -54,6 +54,7 @@ libraryDependencies += "ch.epfl.scala" %% "collection-strawman" % "0.2.0-SNAPSHO
 - [ ] `EqSet`
 - [ ] `BitSet`
 - [x] `View`
+- [x] `Spandex` (new immutable indexed sequence)
 
 ## Implemented operations (on the relevant collection types)
 
