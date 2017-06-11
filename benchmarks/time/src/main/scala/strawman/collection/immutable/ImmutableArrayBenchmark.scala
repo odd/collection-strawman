@@ -57,10 +57,10 @@ class ImmutableArrayBenchmark {
   @Benchmark
   //  @OperationsPerInvocation(size)
   def foreach_while(bh: Blackhole): Unit = {
-    var ys = xs
-    while (ys.nonEmpty) {
-      bh.consume(ys.head)
-      ys = ys.tail
+    var i = 0
+    while (i < xs.size) {
+      bh.consume(xs(i))
+      i = i + 1
     }
   }
 
