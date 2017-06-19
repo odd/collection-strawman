@@ -25,12 +25,12 @@ class SpandexTest {
     assertEquals("apply with 02 arguments has correct elements array", List(O, O, O, 1, 2, O, O, O), List(Spandex(1, 2).primary.elements: _*))
     assertEquals("apply with 03 arguments has correct elements array", List(O, O, 1, 2, 3, O, O, O), List(Spandex(1, 2, 3).primary.elements: _*))
     assertEquals("apply with 04 arguments has correct elements array", List(O, O, 1, 2, 3, 4, O, O), List(Spandex(1, 2, 3, 4).primary.elements: _*))
-    assertEquals("apply with 05 arguments has correct elements array", List(O, O, 1, 2, 3, 4, 5, O, O, O), List(Spandex(1, 2, 3, 4, 5).primary.elements: _*))
-    assertEquals("apply with 06 arguments has correct elements array", List(O, O, O, 1, 2, 3, 4, 5, 6, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6).primary.elements: _*))
-    //assertEquals("apply with 07 arguments has correct elements array", List(O, 1, 2, 3, 4, 5, 6, 7, O, O), List(Spandex(1, 2, 3, 4, 5, 6, 7).primary.elements: _*))
-    //assertEquals("apply with 08 arguments has correct elements array", List(O, 1, 2, 3, 4, 5, 6, 7, 8, O), List(Spandex(1, 2, 3, 4, 5, 6, 7, 8).primary.elements: _*))
-    //assertEquals("apply with 09 arguments has correct elements array", List(1, 2, 3, 4, 5, 6, 7, 8, 9, O), List(Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9).primary.elements: _*))
-    //assertEquals("apply with 10 arguments has correct elements array", List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), List(Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).primary.elements: _*))
+    assertEquals("apply with 05 arguments has correct elements array", List(O, O, O, O, O, 1, 2, 3, 4, 5, O, O, O, O, O, O), List(Spandex(1, 2, 3, 4, 5).primary.elements: _*))
+    assertEquals("apply with 06 arguments has correct elements array", List(O, O, O, O, O, 1, 2, 3, 4, 5, 6, O, O, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6).primary.elements: _*))
+    assertEquals("apply with 07 arguments has correct elements array", List(O, O, O, O, 1, 2, 3, 4, 5, 6, 7, O, O, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6, 7).primary.elements: _*))
+    assertEquals("apply with 08 arguments has correct elements array", List(O, O, O, O, 1, 2, 3, 4, 5, 6, 7, 8, O, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6, 7, 8).primary.elements: _*))
+    assertEquals("apply with 09 arguments has correct elements array", List(O, O, O, O, O, O, O, 1, 2, 3, 4, 5, 6, 7, 8, 9, O, O, O, O, O, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9).primary.elements: _*))
+    assertEquals("apply with 10 arguments has correct elements array", List(O, O, O, O, O, O, O, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, O, O, O, O, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).primary.elements: _*))
   }
 
   @Test

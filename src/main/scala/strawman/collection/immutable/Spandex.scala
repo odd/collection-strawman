@@ -136,10 +136,11 @@ sealed abstract class Spandex[+A] private (protected val index: Int, lengthVecto
         new Spandex.Secondary[B](this.primary, this.index - that.length, this.length + that.length, reversed)
       case that: Spandex[B] =>
         val size = this.size + that.size
-        val array = new Array[Any](size * 2)
-        val index = size / 2
+        val capacity = Spandex.capacitate(size)
+        val array = new Array[Any](capacity)
+        val index = (capacity - size) / 2
         java.lang.System.arraycopy(that.elements, that.index, array, index, that.size)
-        java.lang.System.arraycopy(this.elements, this.index, array, this.size + index, this.size)
+        java.lang.System.arraycopy(this.elements, this.index, array, index + that.size, this.size)
         new Spandex.Primary[A](array, index, size)
       case _ => Spandex.fromIterable(xs).concat(this)
     }
@@ -160,10 +161,11 @@ sealed abstract class Spandex[+A] private (protected val index: Int, lengthVecto
         new Spandex.Secondary[B](that.primary, that.index - this.length, that.length + this.length, reversed)
       case that: Spandex[B] =>
         val size = this.size + that.size
-        val array = new Array[Any](size * 2)
-        val index = size / 2
+        val capacity = Spandex.capacitate(size)
+        val array = new Array[Any](capacity)
+        val index = (capacity - size) / 2
         java.lang.System.arraycopy(this.elements, this.index, array, index, this.size)
-        java.lang.System.arraycopy(that.elements, that.index, array, this.size + index, that.size)
+        java.lang.System.arraycopy(that.elements, that.index, array, index + this.size, that.size)
         new Spandex.Primary[A](array, index, size)
       case _ => fromIterable(View.Concat(coll, xs))
     }
@@ -171,8 +173,7 @@ sealed abstract class Spandex[+A] private (protected val index: Int, lengthVecto
   override final def map[B](f: A => B): Spandex[B] =
     if (isEmpty) Spandex.empty
     else {
-      val capacity = elements.length // TODO: Should the array be prepared for expansion?
-      val array = new Array[Any](capacity)
+      val array = new Array[Any](elements.length)
       var i = length - 1
       while (i >= 0) {
         array(index + i) = f(fetch(i))
@@ -365,14 +366,30 @@ object Spandex extends IterableFactoryWithBuilder[Spandex] {
   def apply[A](it: Iterable[A]): Spandex[A] =
     fromIterable(it)
 
+  private[Spandex] def capacitate(n: Int): Int = ((n * 2 + 7) / 8) * 8
+
   private[Spandex] def apply[A](xs: Array[Any], i: Int, n: Int): Spandex[A] =
     if (n == 0) Spandex.Empty
     else {
-      val capacity = math.max(n * 2, 8)
+      val capacity = capacitate(n)
       val array = new Array[Any](capacity)
       val index = (capacity - n) / 2
-      Array.copy(xs, i, array, index, n)
+      java.lang.System.arraycopy(xs, i, array, index, n)
       new Primary[A](array, index, n)
+    }
+
+  /**
+    * Creates a new empty `Spandex` capable of holding the specified number of elements and initial position.
+    * @param capacity the size of the underlying array
+    * @param position the initial position in the array (default is `capacity / 2`)
+    * @tparam A the type of the elements
+    * @return an empty `Spandex` with the specified capacity and initial position
+    */
+  def create[A](capacity: Int, position: Int = -1): Spandex[A] =
+    if (capacity <= 0) Spandex.Empty
+    else {
+      val array = new Array[Any](capacity)
+      new Primary[A](array, if (position >= 0) math.min(position, capacity - 1) else capacity / 2, 0)
     }
 
   def tabulate[A](n: Int)(f: Int => A): Spandex[A] =
@@ -381,7 +398,7 @@ object Spandex extends IterableFactoryWithBuilder[Spandex] {
   private[Spandex] def tabulate[A](n: Int, margin: Int)(f: Int => A): Spandex[A] =
     if (n == 0) Spandex.Empty
     else {
-      val capacity = math.max(n * 2, 8)
+      val capacity = capacitate(n)
       val array = new Array[Any](capacity)
       val first = (capacity - n + margin) / 2
       val last = first + n - 1
@@ -407,17 +424,17 @@ object Spandex extends IterableFactoryWithBuilder[Spandex] {
     case that: Spandex[A] ⇒ that
     case c if c.knownSize == 0 || c.isEmpty => Spandex.Empty
     case c if c.knownSize > 0 =>
-      val length = c.knownSize
-      val capacity = math.max(length * 2, 8)
+      val n = c.knownSize
+      val capacity = capacitate(n)
       val array = new Array[Any](capacity)
-      val index = (capacity - length) / 2
+      val index = (capacity - n) / 2
       var i = 0
       val it = c.iterator()
-      while (i < length) {
+      while (i < n) {
         array(index + i) = it.next()
         i += 1
       }
-      new Spandex.Primary[A](array, index, length)
+      new Spandex.Primary[A](array, index, n)
     case _ ⇒
       val array = ArrayBuffer.fromIterable(it).asInstanceOf[ArrayBuffer[Any]].toArray
       apply(array, 0, array.length)
