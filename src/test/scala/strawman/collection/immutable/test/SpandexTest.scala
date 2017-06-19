@@ -6,7 +6,7 @@ package test
 import org.junit.Assert._
 import org.junit.Test
 import scala.{Int, Unit, Nothing, Array, Any, AnyRef}
-import scala.Predef.identity
+import scala.Predef.{identity, genericWrapArray}
 import scala.util.Try
 
 class SpandexTest {
