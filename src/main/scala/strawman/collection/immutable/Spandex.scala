@@ -1,38 +1,43 @@
-package strawman.collection.immutable
+package strawman
+package collection
+package immutable
 
 import java.util.concurrent.atomic.AtomicInteger
-import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, Equals, Float, Int, None, Nothing, Option, Some, Unit}
-import scala.Predef.{String, identity, println}
+import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, Int, Nothing, StringContext, Unit, `inline`}
+import scala.Predef.{String, genericWrapArray}
 import scala.math
 import scala.reflect.ClassTag
 import scala.runtime.ScalaRunTime
-import strawman.collection
-import strawman.collection.{Buildable, IterableFactory, IterableFactoryWithBuilder, IterableOnce, Iterator, LinearSeq, View, immutable}
+import strawman.collection.{Buildable, IterableFactory, IterableFactoryWithBuilder, IterableOnce, Iterator, LinearSeq, View}
 import strawman.collection.mutable.{ArrayBuffer, Builder}
 
 /**
   * A <i>Spandex</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
   * <ul>
   * <li>constant time <code>head</code>, <code>last</code>, <code>tail</code>, <code>init</code>, <code>take</code>, <code>takeRight</code>, <code>drop</code>, <code>dropRight</code>, <code>slice</code> and <code>reverse</code></li>
-  * <li>amortised constant time <code>prepend</code> and <code>append</code> (depending on the complexity of <code>java.lang.System.arraycopy</code>)</li>
+  * <li>amortised constant time <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and <code>concat</code> (depending on the complexity of <code>java.lang.System.arraycopy</code>)</li>
   * <li>efficient indexed access</li>
   * <li>linear time iteration (i.e. <code>iterator</code> and <code>foreach</code>) with low constant factors
   * <li>reasonable memory usage (approximately double that of an array with the same number of elements)
   * </ul>
   * <br/>
-  * The underlying array is only mutated on <code>prepend</code> and <code>append</code> but never more than once for any given position (any later modification attempts to an already modified position results in a copy being made of the underlying array).
+  * The underlying array is only mutated on <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and <code>concat</code> but never more than once for any given position (any later modification attempts to an already modified position results in a copy being made of the underlying array).
   * To guarantee that only a single thread can write to an array slot a pair of atomic integers are used to guard the low and high assignments in <code>prepend</code> and <code>append</code>.
   * <br/>
   * <br/>
   * Expansion occurs when the underlying array is full on the effected side; the new array will be populated to have its start position adjusted by the unused capacity (margin) on the non effected side according to the following formula:
-  * <code>starting position = (length + margin) / 2</code> (i.e. for a six element spandex with two slots unused at the end <code>[a, b, c, d, e, f, , ]</code>, a prepend operation would make the expanded array have a length of 12 and a starting position
-  * of <code>(6 + 2) / 2 = 4</code>, <code>[ , , , , a, b, c, d, e, f, , ]</code>). This expansion scheme leads to more free slots being allocated on the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides).
+  * <code>starting position = (length + margin) / 2</code> (i.e. for a six element spandex with two slots unused at the end <code>[a, b, c, d, e, f, , ]</code>, a prepend operation would make the expanded array have a length of 16 (next larger multiple of eight) and
+  * a starting position of <code>(7 + 2) / 2 = 4</code>, <code>[ , , , , a, b, c, d, e, f, , ]</code>). This expansion scheme leads to more free slots being allocated on the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides).
   */
 sealed abstract class Spandex[+A] private (protected val index: Int, lengthVector: Int)
     extends Seq[A]
     with LinearSeq[A]
     with SeqOps[A, Spandex, Spandex[A]]
     with Buildable[A, Spandex[A]] {
+
+  def toDebugString: String
+
+  override def toString = toDebugString
 
   private[immutable] def primary: Spandex.Primary[A]
 
@@ -97,33 +102,44 @@ sealed abstract class Spandex[+A] private (protected val index: Int, lengthVecto
       new Spandex.Primary[A](array, 0, length)
     }
 
-  final def +:[B >: A](b: B): Spandex[B] =
+  /** Alias for `prepend` */
+  @`inline`
+  final def +:[B >: A](b: B): Spandex[B] = prepend(b)
+
+  final def prepend[B >: A](b: B): Spandex[B] =
     if (isEmpty) Spandex(b)
     else if (reversed && primary.raise(b, index, length))
       new Spandex.Secondary[B](primary, index, length + 1, reversed)
     else if (!reversed && primary.lower(b, index, length))
       new Spandex.Secondary[B](primary, index - 1, length + 1, reversed)
-    else if (reversed) {
-      Spandex.tabulate(length + 1, elements.length - length - index) {
+    else {
+      Spandex.expand(length + 1, elements.length - primary.high.get() - 1) {
         case k if k == 0 ⇒ b
         case k ⇒ fetch(k - 1)
       }
-    } else b +: Spandex[A](elements, index, length)
+    }
 
-  final def :+[B >: A](b: B): Spandex[B] =
+  /** Alias for `append` */
+  @`inline`
+  final def :+[B >: A](b: B): Spandex[B] = append(b)
+
+  final def append[B >: A](b: B): Spandex[B] =
     if (isEmpty) Spandex(b)
     else if (reversed && primary.lower(b, index, length))
       new Spandex.Secondary[B](primary, index - 1, length + 1, reversed)
     else if (!reversed && primary.raise(b, index, length))
       new Spandex.Secondary[B](primary, index, length + 1, reversed)
-    else if (reversed) {
-      Spandex.tabulate(length + 1, -index) {
+    else {
+      Spandex.expand(length + 1, -primary.low.get()) {
         case k if k == length ⇒ b
         case k ⇒ fetch(k)
       }
-    } else Spandex[A](elements, index, length) :+ b
+    }
 
-  final def ++:[B >: A](xs: IterableOnce[B]): Spandex[B] =
+  /** Alias for `prependAll` */
+  @`inline` final def ++:[B >: A](xs: IterableOnce[B]): Spandex[B] = prependAll(xs)
+
+  final def prependAll[B >: A](xs: IterableOnce[B]): Spandex[B] =
     xs match {
       case _ if this.isEmpty => Spandex.fromIterable(xs)
       case that: Iterable[B] if that.knownSize == 0 || that.isEmpty => this
@@ -145,7 +161,11 @@ sealed abstract class Spandex[+A] private (protected val index: Int, lengthVecto
       case _ => Spandex.fromIterable(xs).concat(this)
     }
 
-  final def :++[B >: A](xs: IterableOnce[B]): Spandex[B] = concat(xs)
+  /** Alias for `appendAll` */
+  @`inline` final def :++[B >: A](xs: IterableOnce[B]): Spandex[B] = appendAll(xs)
+
+  /** Alias for `concat` */
+  @`inline` final def appendAll[B >: A](xs: IterableOnce[B]): Spandex[B] = concat(xs)
 
   override final def concat[B >: A](xs: IterableOnce[B]): Spandex[B] =
     xs match {
@@ -286,8 +306,10 @@ object Spandex extends IterableFactoryWithBuilder[Spandex] {
         length: Int)
       extends Spandex[A](index, length) {
 
-    private[this] final val low: AtomicInteger = new AtomicInteger(index)
-    private[this] final val high: AtomicInteger = new AtomicInteger(index + length - 1)
+    def toDebugString: String = s"Primary(index: $index, length: $length, elements: ${elements.toList.zipWithIndex.map(t => s"${t._2}: ${t._1}").mkString("[", ", ", "]").replace("null", "_")})"
+
+    private[Spandex] final val low: AtomicInteger = new AtomicInteger(index)
+    private[Spandex] final val high: AtomicInteger = new AtomicInteger(index + length - 1)
 
     override private[immutable] final def primary: Primary[A] = this
 
@@ -353,9 +375,13 @@ object Spandex extends IterableFactoryWithBuilder[Spandex] {
         index: Int,
         length: Int,
         reversed: Boolean)
-      extends Spandex[A](index, if (reversed) -length else length)
+      extends Spandex[A](index, if (reversed) -length else length) {
+    def toDebugString: String = s"Secondary(index: $index, length: $length, reversed: $reversed, primary: ${primary.toDebugString})"
+  }
 
-  private[immutable] final object Empty extends Primary[Nothing](Array.empty, 0, 0)
+  private[immutable] final object Empty extends Primary[Nothing](Array.empty, 0, 0) {
+    override def toDebugString: String = s"Empty"
+  }
 
   override def apply[A](xs: A*): Spandex[A] =
     apply(xs.toArray[Any], 0, xs.length)
@@ -366,7 +392,7 @@ object Spandex extends IterableFactoryWithBuilder[Spandex] {
   def apply[A](it: Iterable[A]): Spandex[A] =
     fromIterable(it)
 
-  private[Spandex] def capacitate(n: Int): Int = ((n * 2 + 7) / 8) * 8
+  private[Spandex] def capacitate(n: Int): Int = ((math.max(n, 8) + 7) / 8) * 8
 
   private[Spandex] def apply[A](xs: Array[Any], i: Int, n: Int): Spandex[A] =
     if (n == 0) Spandex.Empty
@@ -393,12 +419,24 @@ object Spandex extends IterableFactoryWithBuilder[Spandex] {
     }
 
   def tabulate[A](n: Int)(f: Int => A): Spandex[A] =
-    tabulate(n, 0)(f)
-
-  private[Spandex] def tabulate[A](n: Int, margin: Int)(f: Int => A): Spandex[A] =
     if (n == 0) Spandex.Empty
     else {
       val capacity = capacitate(n)
+      val array = new Array[Any](capacity)
+      val first = (capacity - n) / 2
+      val last = first + n - 1
+      var i = first
+      while (i <= last) {
+        array(i) = f(i - first)
+        i += 1
+      }
+      new Primary[A](array, first, n)
+    }
+
+  private[Spandex] def expand[A](n: Int, margin: Int)(f: Int => A): Spandex[A] =
+    if (n == 0) Spandex.Empty
+    else {
+      val capacity = capacitate((n - 1) * 2)
       val array = new Array[Any](capacity)
       val first = (capacity - n + margin) / 2
       val last = first + n - 1

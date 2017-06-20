@@ -5,8 +5,8 @@ package test
 
 import org.junit.Assert._
 import org.junit.Test
-import scala.{Int, Unit, Nothing, Array, Any, AnyRef}
-import scala.Predef.{identity, genericWrapArray}
+import scala.{Int, Unit, Nothing}
+import scala.Predef.{identity}
 import scala.util.Try
 
 class SpandexTest {
@@ -20,17 +20,59 @@ class SpandexTest {
   @Test
   def testApply(): Unit = {
     val O = null
-    assertEquals("apply with 00 arguments has correct elements array", List(), List(Spandex().primary.elements: _*))
-    assertEquals("apply with 01 argument  has correct elements array", List(O, O, O, 1, O, O, O, O), List(Spandex(1).primary.elements: _*))
-    assertEquals("apply with 02 arguments has correct elements array", List(O, O, O, 1, 2, O, O, O), List(Spandex(1, 2).primary.elements: _*))
-    assertEquals("apply with 03 arguments has correct elements array", List(O, O, 1, 2, 3, O, O, O), List(Spandex(1, 2, 3).primary.elements: _*))
-    assertEquals("apply with 04 arguments has correct elements array", List(O, O, 1, 2, 3, 4, O, O), List(Spandex(1, 2, 3, 4).primary.elements: _*))
-    assertEquals("apply with 05 arguments has correct elements array", List(O, O, O, O, O, 1, 2, 3, 4, 5, O, O, O, O, O, O), List(Spandex(1, 2, 3, 4, 5).primary.elements: _*))
-    assertEquals("apply with 06 arguments has correct elements array", List(O, O, O, O, O, 1, 2, 3, 4, 5, 6, O, O, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6).primary.elements: _*))
-    assertEquals("apply with 07 arguments has correct elements array", List(O, O, O, O, 1, 2, 3, 4, 5, 6, 7, O, O, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6, 7).primary.elements: _*))
-    assertEquals("apply with 08 arguments has correct elements array", List(O, O, O, O, 1, 2, 3, 4, 5, 6, 7, 8, O, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6, 7, 8).primary.elements: _*))
-    assertEquals("apply with 09 arguments has correct elements array", List(O, O, O, O, O, O, O, 1, 2, 3, 4, 5, 6, 7, 8, 9, O, O, O, O, O, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9).primary.elements: _*))
-    assertEquals("apply with 10 arguments has correct elements array", List(O, O, O, O, O, O, O, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, O, O, O, O, O, O, O), List(Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).primary.elements: _*))
+    assertEquals("apply with 00 arguments has correct elements array", List(), Spandex().primary.elements.to(List))
+    assertEquals("apply with 01 argument  has correct elements array", List(O, O, O, 1, O, O, O, O), Spandex(1).primary.elements.to(List))
+    assertEquals("apply with 02 arguments has correct elements array", List(O, O, O, 1, 2, O, O, O), Spandex(1, 2).primary.elements.to(List))
+    assertEquals("apply with 03 arguments has correct elements array", List(O, O, 1, 2, 3, O, O, O), Spandex(1, 2, 3).primary.elements.to(List))
+    assertEquals("apply with 04 arguments has correct elements array", List(O, O, 1, 2, 3, 4, O, O), Spandex(1, 2, 3, 4).primary.elements.to(List))
+    assertEquals("apply with 05 arguments has correct elements array", List(O, 1, 2, 3, 4, 5, O, O), Spandex(1, 2, 3, 4, 5).primary.elements.to(List))
+    assertEquals("apply with 06 arguments has correct elements array", List(O, 1, 2, 3, 4, 5, 6, O), Spandex(1, 2, 3, 4, 5, 6).primary.elements.to(List))
+    assertEquals("apply with 07 arguments has correct elements array", List(1, 2, 3, 4, 5, 6, 7, O), Spandex(1, 2, 3, 4, 5, 6, 7).primary.elements.to(List))
+    assertEquals("apply with 08 arguments has correct elements array", List(1, 2, 3, 4, 5, 6, 7, 8), Spandex(1, 2, 3, 4, 5, 6, 7, 8).primary.elements.to(List))
+    assertEquals("apply with 09 arguments has correct elements array", List(O, O, O, 1, 2, 3, 4, 5, 6, 7, 8, 9, O, O, O, O), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9).primary.elements.to(List))
+    assertEquals("apply with 10 arguments has correct elements array", List(O, O, O, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, O, O, O), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).primary.elements.to(List))
+    assertEquals("apply with 11 arguments has correct elements array", List(O, O, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, O, O, O), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11).primary.elements.to(List))
+    assertEquals("apply with 11 arguments has correct elements array", List(O, O, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, O, O), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).primary.elements.to(List))
+  }
+
+  @Test
+  def testExpandFront(): Unit = {
+    val O = null
+    val a = 1 +: 2 +: Spandex(3, 4, 5, 6) :+ 7 :+ 8
+    assertEquals("no empty slots at end expands correctly", List(O, O, O, 0, 1, 2, 3, 4, 5, 6, 7, 8, O, O, O, O), (0 +: a).primary.elements.to(List))
+    val b = 1 +: 2 +: Spandex(3, 4, 5, 6) :+ 7
+    assertEquals("one empty slot at end expands correctly", List(O, O, O, O, 0, 1, 2, 3, 4, 5, 6, 7, O, O, O, O), (0 +: b).primary.elements.to(List))
+    val c = 1 +: 2 +: Spandex(3, 4, 5, 6)
+    assertEquals("two empty slots at end expands correctly", List(O, O, O, O, O, 0, 1, 2, 3, 4, 5, 6, O, O, O, O), (0 +: c).primary.elements.to(List))
+    val d = 1 +: 2 +: Spandex(3, 4, 5)
+    assertEquals("three empty slots at end expands correctly", List(O, O, O, O, O, O, 0, 1, 2, 3, 4, 5, O, O, O, O), (0 +: d).primary.elements.to(List))
+    val e = 0 +: 1 +: 2 +: Spandex(3, 4)
+    assertEquals("three empty slots II at end expands correctly", List(O, O, O, O, O, O, -1, 0, 1, 2, 3, 4, O, O, O, O), (-1 +: e).primary.elements.to(List))
+    val f = 0 +: 1 +: 2 +: Spandex(3)
+    assertEquals("four empty slots at end expands correctly", List(O, O, O, -1, 0, 1, 2, 3), (-1 +: f).primary.elements.to(List))
+    val g = Spandex(1, 2, 3, 4, 5, 6, 7, 8)
+    val h = g.dropRight(7)
+    assertEquals("seven empty slots at end expands correctly", List(O, O, O, 0, 1, O, O, O), (0 +: h).primary.elements.to(List))
+    val i = g.dropRight(8)
+    assertEquals("eight empty slots at end expands correctly", List(O, O, O, 0, O, O, O, O), (0 +: i).primary.elements.to(List))
+  }
+
+  @Test
+  def testExpandEnd(): Unit = {
+    val O = null
+    val a = 1 +: 2 +: Spandex(3, 4, 5, 6) :+ 7 :+ 8
+    assertEquals("no empty slots at front expands correctly", List(O, O, O, 1, 2, 3, 4, 5, 6, 7, 8, 9, O, O, O, O), (a :+ 9).primary.elements.to(List))
+    val b = 2 +: Spandex(3, 4, 5, 6) :+ 7 :+ 8
+    assertEquals("one empty slot at front expands correctly", List(O, O, O, 2, 3, 4, 5, 6, 7, 8, 9, O, O, O, O, O), (b :+ 9).primary.elements.to(List))
+    val c = Spandex(3, 4, 5, 6) :+ 7 :+ 8
+    assertEquals("two empty slots at front expands correctly", List(O, O, O, 3, 4, 5, 6, 7 ,8, 9, O, O, O, O, O, O), (c :+ 9).primary.elements.to(List))
+    val d = Spandex(3, 4) :+ 5 :+ 6 :+ 7
+    assertEquals("three empty slots at front expands correctly", List(O, O, O, 3, 4, 5, 6, 7, 8, O, O, O, O, O, O, O), (d :+ 8).primary.elements.to(List))
+    val g = Spandex(1, 2, 3, 4, 5, 6, 7, 8)
+    val h = g.drop(7)
+    assertEquals("seven empty slots at front expands correctly", List(O, O, O, 8, 9, O, O, O), (h :+ 9).primary.elements.to(List))
+    val i = g.drop(8)
+    assertEquals("eight empty slots at front expands correctly", List(O, O, O, 9, O, O, O, O), (i :+ 9).primary.elements.to(List))
   }
 
   @Test
@@ -47,6 +89,7 @@ class SpandexTest {
     assertEquals("apply with single argument has empty tail", Spandex.empty, Spandex(1).tail)
     assertEquals("apply with reversed single argument has empty tail", Spandex.empty, Spandex(1).reverse.tail)
   }
+
   @Test
   def testHeadsAndTails(): Unit = {
     assertTrue("empty tail fails", Try(Spandex.empty.tail).isFailure)
@@ -68,6 +111,7 @@ class SpandexTest {
     assertEquals("tail tail tail head", 4, Spandex(1, 2, 3, 4).tail.tail.tail.head)
     assertEquals("tail reverse tail reverse tail reverse head", 3, Spandex(1, 2, 3, 4).tail.reverse.tail.reverse.tail.reverse.head)
   }
+
   @Test
   def testTakeAndDrop(): Unit = {
     assertEquals("take 0", Spandex.empty, Spandex(1, 2, 3, 4).take(0))
@@ -93,6 +137,7 @@ class SpandexTest {
     assertEquals("drop 2 take 2 drop 1 take 1", Spandex(4), Spandex(1, 2, 3, 4).drop(2).take(2).drop(1).take(1))
     assertEquals("reverse drop 2 take 2 drop 1 take 1", Spandex(1), Spandex(1, 2, 3, 4).reverse.drop(2).take(2).drop(1).take(1))
   }
+
   @Test
   def testFilter(): Unit = {
     assertEquals("filter empty", Spandex.empty, Spandex().filter(_ != null))
@@ -103,6 +148,7 @@ class SpandexTest {
     assertEquals("filter multiple odd", Spandex(1, 3), Spandex(1, 2, 3, 4).filter(_ % 2 == 1))
     assertEquals("reverse filter multiple odd", Spandex(3, 1), Spandex(1, 2, 3, 4).reverse.filter(_ % 2 == 1))
   }
+
   @Test
   def testMap(): Unit = {
     assertEquals("map empty", Spandex.empty, Spandex().map(identity))
@@ -112,6 +158,7 @@ class SpandexTest {
     assertEquals("map multiple", Spandex(1, 4, 9, 16), Spandex(1, 2, 3, 4).map(n => n * n))
     assertEquals("reverse map multiple", Spandex(16, 9, 4, 1), Spandex(1, 2, 3, 4).reverse.map(n => n * n))
   }
+
   @Test
   def testFlatMap(): Unit = {
     assertEquals("flatmap empty", Spandex.empty, Spandex().flatMap(x => Spandex(x)))
@@ -125,6 +172,7 @@ class SpandexTest {
       case _ => Spandex.empty
     })
   }
+
   @Test
   def testFill(): Unit = {
     assertEquals("fill empty", Spandex.empty, Spandex.fill(0)(9))
@@ -132,6 +180,7 @@ class SpandexTest {
     assertEquals("fill multiple", Spandex(9, 9, 9), Spandex.fill(3)(9))
     assertEquals("fill multiple reverse", Spandex(9, 9, 9), Spandex.fill(3)(9).reverse)
   }
+
   @Test
   def testPrepend(): Unit = {
     assertEquals("prepend on empty", Spandex(1), 1 +: Spandex.empty)
@@ -142,6 +191,7 @@ class SpandexTest {
       Spandex(-2, -1, 0, 1, 2, 3, 4, 5, 6),
       -2 +: -1 +: 0 +: Spandex(1, 2, 3, 4, 5, 6))
   }
+
   @Test
   def testAppend(): Unit = {
     assertEquals("append on empty", Spandex(1), Spandex.empty :+ 1)
@@ -152,6 +202,7 @@ class SpandexTest {
       Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       Spandex(1, 2, 3, 4, 5, 6) :+ 7 :+ 8 :+ 9 :+ 10)
   }
+
   @Test
   def testPrependAndAppendEqual(): Unit = {
     assertEquals("prepend equal on empty", Spandex(1), 1 +: (1 +: Spandex.empty).tail)
@@ -172,6 +223,7 @@ class SpandexTest {
     assertEquals("prepend equal", Spandex(-1, 0, 1, 2, 3), e)
     assertEquals("prepend equal", Spandex(-2, 0, 1, 2, 3), f)
   }
+
   @Test
   def testPrependAll(): Unit = {
     assertEquals("prepend all with list on empty", Spandex(1, 2, 3), List(1, 2, 3) ++: Spandex.empty)
@@ -180,6 +232,7 @@ class SpandexTest {
     assertEquals("prepend all with multiple lists", Spandex(-3, -2, -1, 0, 1, 2, 3, 4), List(-3, -2) ++: List(-1, 0) ++: 1 +: Spandex(2, 3, 4))
     assertEquals("prepend all with multiple lists reversed", Spandex(-3, -2, 4, 3, 2, 1, 0, -1), List(-3, -2) ++: (List(-1, 0) ++: 1 +: Spandex(2, 3, 4)).reverse)
   }
+
   @Test
   def testConcat(): Unit = {
     assertEquals("concat empty with empty", Spandex.empty, Spandex.empty[Nothing] ++ Spandex.empty) // Explicit type annotation needed to avoid dotty bug.
@@ -212,6 +265,7 @@ class SpandexTest {
       Spandex(-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, -1),
       large ++ large.reverse)
   }
+
   @Test
   def testImmutablity(): Unit = {
     val a = Spandex()
@@ -237,6 +291,7 @@ class SpandexTest {
     assertEquals("immutablity of multiple still", Spandex(2, 3, 4, 5), f)
     assertEquals("immutablity of multiple still", Spandex(0, 1, 2, 3, 4, 5), g)
   }
+
   @Test
   def testLarge(): Unit = {
     val a = Spandex.tabulate(10)(identity)
@@ -319,6 +374,7 @@ class SpandexTest {
     assertEquals("large h equals its reversed reverse", h, h.reverse.reverse)
     assertEquals("large h2 equals its reversed reverse", h2, h2.reverse.reverse)
   }
+
   @Test
   def testIterator(): Unit = {
     var it = Spandex.empty[Int].iterator()
@@ -354,6 +410,7 @@ class SpandexTest {
       "subs iterator has correct elements",
       it3.sameElements(List(a1, a2, b)))
   }
+
   @Test
   def testForeach(): Unit = {
     var n = 0
@@ -367,6 +424,7 @@ class SpandexTest {
     Spandex(1, 2, 3).reverse.foreach(x => m -= x)
     assertEquals("multiple foreach reversed", 0, m)
   }
+
   @Test
   def testIndexWhere(): Unit = {
     assertEquals("empty index where", -1, Spandex.empty[Int].indexWhere(_ => true))
@@ -375,6 +433,7 @@ class SpandexTest {
     assertEquals("multiple index where exists", 1, Spandex(1, 2, 3, 4).indexWhere(x => x % 2 == 0))
     assertEquals("multiple index where not exists", -1, Spandex(1, 2, 3, 4).indexWhere(x => x == 5))
   }
+
   @Test
   def testFoldLeft(): Unit = {
     assertEquals("empty fold left", 0, Spandex.empty[Int].foldLeft(0) {
@@ -387,6 +446,7 @@ class SpandexTest {
       case (acc, x) => acc - x
     })
   }
+
   @Test
   def testFoldRight(): Unit = {
     assertEquals("empty fold right", 0, Spandex.empty[Int].foldRight(0) {
@@ -399,12 +459,14 @@ class SpandexTest {
       case (x, acc) => x - acc
     })
   }
+
   @Test
   def testFromIterable(): Unit = {
     assertEquals("empty list is empty", Spandex.empty, Spandex.fromIterable(List.empty))
     assertEquals("empty scala list is empty", Spandex.empty, Spandex.fromIterable(Nil))
     assertEquals("empty lazy list is empty", Spandex.empty, Spandex.fromIterable[Int](LazyList.empty))
   }
+
   @Test
   def testTrim(): Unit = {
     assertEquals("empty trimmed is empty", Spandex.empty, Spandex.fromIterable(List.empty).trim())
@@ -415,6 +477,7 @@ class SpandexTest {
     assertEquals("multiple trimmed has elements array with correct element", 2, Spandex(1, 2, 3).trim().primary.elements(1))
     assertEquals("multiple trimmed has elements array with correct element", 3, Spandex(1, 2, 3).trim().primary.elements(2))
   }
+
   @Test
   def testPrependEqElement(): Unit = {
     val a = Spandex(1, 2, 3)
@@ -428,6 +491,7 @@ class SpandexTest {
     assertSame("prepend equal single on tail equals original", d.primary.elements, e.primary.elements)
     assertNotSame("prepend non equal single on tail does not equal original", d.primary.elements, f.primary.elements)
   }
+
   @Test
   def testAppendEqElement(): Unit = {
     val a = Spandex(1, 2, 3)
@@ -491,5 +555,4 @@ class SpandexTest {
     assertEquals("drop right 2 take right 0", Spandex.empty, Spandex(1, 2, 3, 4).dropRight(2).takeRight(0))
     assertEquals("drop right 2 take right 2 drop right 1 take right 1", Spandex(1), Spandex(1, 2, 3, 4).dropRight(2).takeRight(2).dropRight(1).takeRight(1))
   }
-
 }
