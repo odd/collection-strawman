@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class VectorBenchmark {
 
-  @Param(scala.Array(/*"0", */"1", "2", "3", "4", "7", "8"/*, "15"*/, "16", "17", "39", "282", "4096", "31999"/*, "73121", "7312102"*/))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17", "39", "282", "4096", "31999"/*, "73121", "7312102"*/))
   var size: Int = _
 
   var xs: Vector[Long] = _
@@ -34,7 +34,7 @@ class VectorBenchmark {
   }
 
   @Benchmark
-//  @OperationsPerInvocation(size)
+  //@OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
     var ys = Vector.empty[Long]
     var i = 0L
@@ -46,7 +46,22 @@ class VectorBenchmark {
   }
 
   @Benchmark
+    //@OperationsPerInvocation(size)
+  def snoc(bh: Blackhole): Unit = {
+    var ys = Vector.empty[Long]
+    var i = 0L
+    while (i < size) {
+      ys = ys :+ i // Note: In the case of TreeSet, always inserting elements that are already ordered creates a bias
+      i = i + 1
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
   def uncons(bh: Blackhole): Unit = bh.consume(xs.tail)
+
+  @Benchmark
+  def unsnoc(bh: Blackhole): Unit = bh.consume(xs.init)
 
   @Benchmark
   def concat(bh: Blackhole): Unit = bh.consume(xs ++ xs)
@@ -55,7 +70,7 @@ class VectorBenchmark {
   def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
-//  @OperationsPerInvocation(size)
+  //@OperationsPerInvocation(size)
   def foreach_while(bh: Blackhole): Unit = {
     var ys = xs
     while (ys.nonEmpty) {

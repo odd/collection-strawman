@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
  class ListBenchmark {
 
-  @Param(scala.Array(/*"0", */"1", "2", "3", "4", "7", "8"/*, "15"*/, "16", "17", "39", "282", "4096", "31999"/*, "73121", "7312102"*/))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17", "39", "282", "4096", "31999"/*, "73121", "7312102"*/))
   var size: Int = _
 
   var xs: List[Long] = _
@@ -34,7 +34,7 @@ import scala.Predef.intWrapper
   }
 
   @Benchmark
-  //  @OperationsPerInvocation(size)
+    //@OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
     var ys = List.empty[Long]
     var i = 0L
@@ -55,7 +55,7 @@ import scala.Predef.intWrapper
   def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
-  //  @OperationsPerInvocation(size)
+    //@OperationsPerInvocation(size)
   def foreach_while(bh: Blackhole): Unit = {
     var ys = xs
     while (ys.nonEmpty) {

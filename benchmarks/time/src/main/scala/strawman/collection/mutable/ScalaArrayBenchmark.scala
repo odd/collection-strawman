@@ -34,7 +34,7 @@ class ScalaArrayBenchmark {
   }
 
   @Benchmark
-  //  @OperationsPerInvocation(size)
+    //@OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
     var ys = scala.Array.empty[Long]
     var i = 0L
@@ -55,7 +55,7 @@ class ScalaArrayBenchmark {
   def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
-  //  @OperationsPerInvocation(size)
+    //@OperationsPerInvocation(size)
   def foreach_while(bh: Blackhole): Unit = {
     var ys = xs
     while (ys.nonEmpty) {

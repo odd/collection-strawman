@@ -21,13 +21,17 @@ import strawman.collection.mutable.{ArrayBuffer, Builder}
   * <li>reasonable memory usage (approximately double that of an array with the same number of elements)
   * </ul>
   * <br/>
-  * The underlying array is only mutated on <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and <code>concat</code> but never more than once for any given position (any later modification attempts to an already modified position results in a copy being made of the underlying array).
-  * To guarantee that only a single thread can write to an array slot a pair of atomic integers are used to guard the low and high assignments in <code>prepend</code> and <code>append</code>.
+  * The underlying array is only mutated on <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and
+  * <code>concat</code> but never more than once for any given position (any later modification attempts to an already modified position
+  * results in a copy being made of the underlying array).
+  * To guarantee that only a single thread can write to an array slot a pair of atomic integers are used to guard the low and high
+  * assignments in <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and <code>concat</code>.
   * <br/>
   * <br/>
-  * Expansion occurs when the underlying array is full on the effected side; the new array will be populated to have its start position adjusted by the unused capacity (margin) on the non effected side according to the following formula:
-  * <code>starting position = (length + margin) / 2</code> (i.e. for a six element spandex with two slots unused at the end <code>[a, b, c, d, e, f, , ]</code>, a prepend operation would make the expanded array have a length of 16 (next larger multiple of eight) and
-  * a starting position of <code>(7 + 2) / 2 = 4</code>, <code>[ , , , , a, b, c, d, e, f, , ]</code>). This expansion scheme leads to more free slots being allocated on the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides).
+  * Expansion occurs when the underlying array is full on the effected side; the new array will be populated to have its start position
+  * adjusted by the unused capacity (margin) on the non effected side. This expansion scheme leads to more free slots being allocated on
+  * the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides with a right side bias if the
+  * free slot count is odd).
   */
 sealed abstract class Spandex[+A] private (protected val index: Int, lengthVector: Int)
     extends Seq[A]
