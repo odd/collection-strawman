@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class LazyListBenchmark {
 
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17", "39", "282", "4096", "31999"/*, "73121", "7312102"*/))
+  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "7312102"))
   var size: Int = _
 
   var xs: LazyList[Long] = _
@@ -34,7 +34,7 @@ class LazyListBenchmark {
   }
 
   @Benchmark
-    //@OperationsPerInvocation(size)
+  //  @OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
     var ys = LazyList.empty[Long]
     var i = 0L
@@ -114,4 +114,11 @@ class LazyListBenchmark {
       bh.consume(n)
       acc - 1
   })
+
+  @Benchmark
+  def groupBy(bh: Blackhole): Unit = {
+    val result = xs.groupBy(_ % 5)
+    bh.consume(result)
+  }
+
 }

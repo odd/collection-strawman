@@ -14,18 +14,18 @@ import scala.Predef.intWrapper
 @Warmup(iterations = 12)
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
-class VectorBenchmark {
+class ScalaVectorBenchmark {
 
   @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "7312102"))
   var size: Int = _
 
-  var xs: Vector[Long] = _
-  var xss: scala.Array[Vector[Long]] = _
+  var xs: scala.Vector[Long] = _
+  var xss: scala.Array[scala.Vector[Long]] = _
   var randomIndices: scala.Array[Int] = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection() = Vector((1 to size).map(_.toLong): _*)
+    def freshCollection() = scala.Vector((1 to size).map(_.toLong): _*)
     xs = freshCollection()
     xss = scala.Array.fill(1000)(freshCollection())
     if (size > 0) {
@@ -35,19 +35,7 @@ class VectorBenchmark {
 
   @Benchmark
   def cons(bh: Blackhole): Unit = {
-    var ys = Vector.empty[Long]
-    var i = 0L
-    while (i < size) {
-      ys = i +: ys
-      i = i + 1
-    }
-    bh.consume(ys)
-  }
-
-  @Benchmark
-    //@OperationsPerInvocation(size)
-  def snoc(bh: Blackhole): Unit = {
-    var ys = Vector.empty[Long]
+    var ys = scala.Vector.empty[Long]
     var i = 0L
     while (i < size) {
       ys = ys :+ i
@@ -60,34 +48,10 @@ class VectorBenchmark {
   def uncons(bh: Blackhole): Unit = bh.consume(xs.tail)
 
   @Benchmark
-  def unsnoc(bh: Blackhole): Unit = bh.consume(xs.init)
-
-  @Benchmark
   def concat(bh: Blackhole): Unit = bh.consume(xs ++ xs)
 
   @Benchmark
   def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
-
-  @Benchmark
-  //@OperationsPerInvocation(size)
-  def foreach_while(bh: Blackhole): Unit = {
-    var ys = xs
-    while (ys.nonEmpty) {
-      bh.consume(ys.head)
-      ys = ys.tail
-    }
-  }
-
-  @Benchmark
-  def iterator(bh: Blackhole): Any = {
-    var n = 0
-    val it = xs.iterator
-    while (it.hasNext) {
-      bh.consume(it.next())
-      n += 1
-    }
-    bh.consume(n)
-  }
 
   @Benchmark
   @OperationsPerInvocation(1000)
@@ -113,19 +77,9 @@ class VectorBenchmark {
   def map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
 
   @Benchmark
-  def reverse(bh: Blackhole): Any = bh.consume(xs.reverse)
+  def groupBy(bh: Blackhole): Unit = {
+    val result = xs.groupBy(_ % 5)
+    bh.consume(result)
+  }
 
-  @Benchmark
-  def foldLeft(bh: Blackhole): Any = bh.consume(xs.foldLeft(0) {
-    case (acc, n) =>
-      bh.consume(n)
-      acc + 1
-  })
-
-  @Benchmark
-  def foldRight(bh: Blackhole): Any = bh.consume(xs.foldRight(0) {
-    case (n, acc) =>
-      bh.consume(n)
-      acc - 1
-  })
 }

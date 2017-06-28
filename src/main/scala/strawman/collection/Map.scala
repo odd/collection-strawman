@@ -3,8 +3,9 @@ package collection
 
 import collection.mutable.Builder
 
-import scala.{Any, Boolean, `inline`, None, NoSuchElementException, Nothing, Option, Ordering, PartialFunction, Some}
+import scala.{Any, Boolean, ClassCastException, Equals, Int, NoSuchElementException, None, Nothing, Option, Ordering, PartialFunction, Some, `inline`}
 import scala.annotation.unchecked.uncheckedVariance
+import scala.util.hashing.MurmurHash3
 
 /** Base Map type */
 trait Map[K, +V] extends Iterable[(K, V)] with MapOps[K, V, Map, Map[K, V]]
@@ -12,9 +13,10 @@ trait Map[K, +V] extends Iterable[(K, V)] with MapOps[K, V, Map, Map[K, V]]
 /** Base Map implementation type */
 trait MapOps[K, +V, +CC[X, Y] <: Map[X, Y], +C <: Map[K, V]]
   extends IterableOps[(K, V), Iterable, C]
-     with PartialFunction[K, V] {
+    with PartialFunction[K, V]
+    with Equals {
 
-  protected def coll: Map[K, V]
+  protected[this] def coll: Map[K, V]
 
   /** Similar to fromIterable, but returns a Map collection type */
   protected[this] def mapFromIterable[K2, V2](it: Iterable[(K2, V2)]): CC[K2, V2]
@@ -26,6 +28,22 @@ trait MapOps[K, +V, +CC[X, Y] <: Map[X, Y], +C <: Map[K, V]]
     *          or `None` if none exists.
     */
   def get(key: K): Option[V]
+
+  /**  Returns the value associated with a key, or a default value if the key is not contained in the map.
+   *   @param   key      the key.
+   *   @param   default  a computation that yields a default value in case no binding for `key` is
+   *                     found in the map.
+   *   @tparam  V1       the result type of the default computation.
+   *   @return  the value associated with `key` if it exists,
+   *            otherwise the result of the `default` computation.
+   *
+   *   @usecase def getOrElse(key: K, default: => V): V
+   *     @inheritdoc
+   */
+  def getOrElse[V1 >: V](key: K, default: => V1): V1 = get(key) match {
+    case Some(v) => v
+    case None => default
+  }
 
   /** Retrieves the value which is associated with the given key. This
     *  method invokes the `default` method of the map if there is no mapping
@@ -83,6 +101,31 @@ trait MapOps[K, +V, +CC[X, Y] <: Map[X, Y], +C <: Map[K, V]]
   /** Alias for `concat` */
   /*@`inline` final*/ def ++ [V2 >: V](xs: collection.Iterable[(K, V2)]): CC[K, V2] = concat(xs)
 
+  def canEqual(that: Any): Boolean = true
+
+  override def equals(o: Any): Boolean = o match {
+    case that: Map[b, _] =>
+      (this eq that) ||
+      (that canEqual this) &&
+      (this.size == that.size) && {
+        try {
+          this forall {
+            case (k, v) => that.get(k.asInstanceOf[b]) match {
+              case Some(`v`) =>
+                true
+              case _ => false
+            }
+          }
+        } catch {
+          case _: ClassCastException => false
+        }
+      }
+    case _ =>
+      false
+  }
+
+  override def hashCode(): Int = Set.unorderedHash(coll, "Map".##)
+
 }
 
-object Map extends MapFactory.Delegate[Map](immutable.Map)
+object Map extends MapFactoryWithBuilder.Delegate[Map](immutable.Map)

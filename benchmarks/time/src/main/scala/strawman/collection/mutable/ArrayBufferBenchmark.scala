@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class ArrayBufferBenchmark {
 
-  @Param(scala.Array(/*"0", */"1", "2", "3", "4", "7", "8"/*, "15"*/, "16", "17", "39", "282", "4096", "31999"/*, "73121", "7312102"*/))
+  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "7312102"))
   var size: Int = _
 
   var xs: ArrayBuffer[Long] = _
@@ -35,7 +35,7 @@ class ArrayBufferBenchmark {
 
 
   @Benchmark
-    //@OperationsPerInvocation(size)
+  //  @OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
     var ys = ArrayBuffer.empty[Long]
     var i = 0L
@@ -115,4 +115,11 @@ class ArrayBufferBenchmark {
       bh.consume(n)
       acc - 1
   })
+
+  @Benchmark
+  def groupBy(bh: Blackhole): Unit = {
+    val result = xs.groupBy(_ % 5)
+    bh.consume(result)
+  }
+
 }

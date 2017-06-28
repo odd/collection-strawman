@@ -1,5 +1,7 @@
 package strawman.collection
 
+import strawman.collection.mutable.Builder
+
 import scala.{Any, Boolean, Equals, Int, Nothing, annotation}
 import scala.Predef.intWrapper
 
@@ -9,8 +11,10 @@ trait View[+A] extends Iterable[A] with IterableOps[A, View, View[A]] {
 
   def iterableFactory = View
 
-  override protected[this] def fromSpecificIterable(coll: Iterable[A]): View[A] =
-    fromIterable(coll)
+  protected[this] def fromSpecificIterable(coll: Iterable[A]): View[A] = fromIterable(coll)
+
+  protected[this] def newSpecificBuilder(): Builder[A, View[A]] =
+    immutable.IndexedSeq.newBuilder().mapResult(_.view)
 
   override def className = "View"
 }
@@ -35,6 +39,21 @@ object View extends IterableFactory[View] {
   case object Empty extends View[Nothing] {
     def iterator() = Iterator.empty
     override def knownSize = 0
+  }
+
+  /** A view with exactly one element */
+  case class Single[A](a: A) extends View[A] {
+    def iterator(): Iterator[A] =
+      new Iterator[A] {
+        private var notConsumed: Boolean = true
+        def next(): A =
+          if (notConsumed) {
+            notConsumed = false
+            a
+          } else Iterator.empty.next()
+        def hasNext: Boolean = notConsumed
+      }
+    override def knownSize: Int = 1
   }
 
   /** A view with given elements */
@@ -147,6 +166,35 @@ object View extends IterableFactory[View] {
       case _ => -1
     }
   }
+
+  /** A view that appends an element to its elements */
+  case class Append[A](underlying: Iterable[A], elem: A) extends View[A] {
+    def iterator(): Iterator[A] = Concat(underlying, View.Single(elem)).iterator()
+    override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize + 1 else -1
+  }
+
+  /** A view that prepends an element to its elements */
+  case class Prepend[A](elem: A, underlying: Iterable[A]) extends View[A] {
+    def iterator(): Iterator[A] = Concat(View.Single(elem), underlying).iterator()
+    override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize + 1 else -1
+  }
+
+  case class Updated[A](underlying: Iterable[A], index: Int, elem: A) extends View[A] {
+    def iterator(): Iterator[A] =
+      new Iterator[A] {
+        private val it = underlying.iterator()
+        private var i = 0
+        def next(): A = {
+          val value =
+            if (i == index) { it.next(); elem } else it.next()
+          i += 1
+          value
+        }
+        def hasNext: Boolean = it.hasNext
+      }
+    override def knownSize: Int = underlying.knownSize
+  }
+
 }
 
 /** A trait representing indexable collections with finite length */

@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class ScalaTreeSetBenchmark {
 
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17", "39", "282", "4096", "31999"/*, "73121", "7312102"*/))
+  @Param(scala.Array(/*"0", */"1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "7312102"))
   var size: Int = _
 
   var xs: scala.collection.immutable.TreeSet[Long] = _
@@ -27,14 +27,14 @@ class ScalaTreeSetBenchmark {
   def initData(): Unit = {
     def freshCollection() = scala.collection.immutable.TreeSet((1 to size).map(_.toLong): _*)
     xs = freshCollection()
-    xss = scala.Array.fill(1000)(freshCollection())
-    if (size > 0) {
-      randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-    }
+    //    xss = scala.Array.fill(1000)(freshCollection())
+    //    if (size > 0) {
+    //      randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
+    //    }
   }
 
   @Benchmark
-    //@OperationsPerInvocation(size)
+  //  @OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
     var ys = scala.collection.immutable.TreeSet.empty[Long]
     var i = 0L
@@ -116,4 +116,11 @@ class ScalaTreeSetBenchmark {
       bh.consume(n)
       acc - 1
   })
+
+  @Benchmark
+  def groupBy(bh: Blackhole): Unit = {
+    val result = xs.groupBy(_ % 5)
+    bh.consume(result)
+  }
+
 }

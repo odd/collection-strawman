@@ -1,7 +1,7 @@
 package strawman
 package collection.mutable
 
-import strawman.collection.{Iterator, MapFactory}
+import strawman.collection.{Iterator, MapFactory, MapFactoryWithBuilder, StrictOptimizedIterableOps}
 
 import scala.{Boolean, Int, None, Option, SerialVersionUID, Serializable, Some, Unit}
 import java.lang.String
@@ -24,6 +24,7 @@ import java.lang.String
 final class HashMap[K, V] private[collection] (contents: HashTable.Contents[K, DefaultEntry[K, V]])
   extends Map[K, V]
     with MapOps[K, V, HashMap, HashMap[K, V]]
+    with StrictOptimizedIterableOps[(K, V), HashMap[K, V]]
     with Serializable {
 
   private[this] val table: HashTable[K, V, DefaultEntry[K, V]] =
@@ -39,6 +40,8 @@ final class HashMap[K, V] private[collection] (contents: HashTable.Contents[K, D
 
   protected[this] def fromSpecificIterable(coll: collection.Iterable[(K, V)]): HashMap[K, V] = HashMap.fromIterable(coll)
   protected[this] def mapFromIterable[K2, V2](it: collection.Iterable[(K2, V2)]): HashMap[K2, V2] = HashMap.fromIterable(it)
+
+  protected[this] def newSpecificBuilder(): Builder[(K, V), HashMap[K, V]] =  new GrowableBuilder(HashMap.empty[K, V])
 
   def iterator(): Iterator[(K, V)] = table.entriesIterator.map(e => (e.key, e.value))
 
@@ -75,6 +78,22 @@ final class HashMap[K, V] private[collection] (contents: HashTable.Contents[K, D
     val e = table.findOrAddEntry(key, value)
     if (e eq null) None
     else { val v = e.value; e.value = value; Some(v) }
+  }
+
+  override def getOrElseUpdate(key: K, defaultValue: => V): V = {
+    val hash = table.elemHashCode(key)
+    val i = table.index(hash)
+    val entry = table.findEntry0(key, i)
+    if (entry != null) entry.value
+    else {
+      val table0 = table
+      val default = defaultValue
+      // Avoid recomputing index if the `defaultValue()` hasn't triggered
+      // a table resize.
+      val newEntryIndex = if (table0 eq table) i else table.index(hash)
+      table.addEntry0(table.createNewEntry(key, default), newEntryIndex)
+      default
+    }
   }
 
   private def writeObject(out: java.io.ObjectOutputStream): Unit = {

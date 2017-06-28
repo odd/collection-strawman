@@ -3,7 +3,7 @@ package collection
 package immutable
 
 import BitSetOps.{LogWL, updateArray}
-import mutable.Builder
+import mutable.{Builder, GrowableBuilder}
 
 import scala.{Array, Boolean, Int, Long, Ordering, SerialVersionUID, Serializable, Unit}
 import scala.Predef.require
@@ -22,6 +22,7 @@ sealed abstract class BitSet
     with collection.BitSet
     with SortedSetOps[Int, SortedSet, BitSet]
     with collection.BitSetOps[BitSet]
+    with StrictOptimizedIterableOps[Int, BitSet]
     with Serializable {
 
   def empty: BitSet = BitSet.empty
@@ -30,7 +31,7 @@ sealed abstract class BitSet
 
   protected[this] def fromSpecificIterable(coll: collection.Iterable[Int]): BitSet = BitSet.fromSpecificIterable(coll)
   protected[this] def sortedFromIterable[B : Ordering](it: collection.Iterable[B]): SortedSet[B] = SortedSet.sortedFromIterable(it)
-
+  protected[this] def newSpecificBuilder(): Builder[Int, BitSet] = BitSet.newBuilder()
 
   protected[collection] def fromBitMaskNoCopy(elems: Array[Long]): BitSet = BitSet.fromBitMaskNoCopy(elems)
 
@@ -58,13 +59,18 @@ sealed abstract class BitSet
   protected def updateWord(idx: Int, w: Long): BitSet
 }
 
-object BitSet extends SpecificIterableFactory[Int, BitSet] {
+object BitSet extends SpecificIterableFactoryWithBuilder[Int, BitSet] {
 
   def fromSpecificIterable(it: strawman.collection.Iterable[Int]): BitSet =
     it match {
       case bs: BitSet => bs
       case _          => empty.++(it)
     }
+
+  def empty: BitSet = new BitSet1(0L)
+
+  def newBuilder(): Builder[Int, BitSet] =
+    new GrowableBuilder(mutable.BitSet.empty).mapResult(bs => fromBitMaskNoCopy(bs.elems))
 
   private def createSmall(a: Long, b: Long): BitSet = if (b == 0L) new BitSet1(a) else new BitSet2(a, b)
 
@@ -90,8 +96,6 @@ object BitSet extends SpecificIterableFactory[Int, BitSet] {
     else if (len == 2) createSmall(elems(0), elems(1))
     else new BitSetN(elems)
   }
-
-  def empty: BitSet = new BitSet1(0L)
 
   @SerialVersionUID(2260107458435649300L)
   class BitSet1(val elems: Long) extends BitSet {

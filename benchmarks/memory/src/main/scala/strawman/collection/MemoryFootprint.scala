@@ -1,13 +1,13 @@
 package bench
 
-import strawman.collection.immutable.{LazyList, List, Range, NumericRange, ImmutableArray, Spandex}
+import strawman.collection.immutable.{LazyList, List, Range, NumericRange, Vector, ImmutableArray, Spandex}
+import strawman.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.{Any, AnyRef, App, Int, Long, Seq, StringContext}
 import scala.Predef.{ArrowAssoc, println, intWrapper}
 import scala.compat.Platform
 import java.lang.Runtime
 import java.nio.file.{Files, Paths}
 
-import strawman.collection.mutable.{ArrayBuffer, ListBuffer}
 
 object MemoryFootprint extends App {
 
@@ -39,6 +39,8 @@ object MemoryFootprint extends App {
       "scala.List"    -> benchmark(scala.List.fill(_)(obj)),
       "List"          -> benchmark(List.fill(_)(obj)),
       "LazyList"      -> benchmark(LazyList.fill(_)(obj)),
+      "scala.Vector"  -> benchmark(scala.Vector.fill(_)(obj)),
+      "Vector"        -> benchmark(Vector.fill(_)(obj)),
       "scala.HashSet" -> benchmark(n => scala.collection.immutable.HashSet((1 to n).map(_.toString): _*)),
       "HashSet"       -> benchmark(n => strawman.collection.immutable.HashSet((1 to n).map(_.toString): _*)),
       "scala.TreeSet" -> benchmark(n => scala.collection.immutable.TreeSet((1 to n).map(_.toString): _*)),
@@ -49,8 +51,6 @@ object MemoryFootprint extends App {
       "immutable.Array (primitive)" -> benchmark(ImmutableArray.fill(_)(123)),
       "scala.Array"   -> benchmark(scala.Array.fill(_)(obj)),
       "scala.Array (primitive)" -> benchmark(scala.Array.fill(_)(obj)),
-      "scala.Vector"  -> benchmark(scala.Vector.fill(_)(obj)),
-      "scala.Vector (primitive)"    -> benchmark(scala.Vector.fill(_)(123)),
       "Range"         -> benchmark(Range(0, _)),
       "NumericRange"  -> benchmark(NumericRange(0, _, 1)),
       "Spandex"       -> benchmark(Spandex.fill(_)(obj)),

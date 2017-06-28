@@ -46,7 +46,7 @@ See the [CONTRIBUTING](CONTRIBUTING.md) file.
 - [ ] `LinkedList`
 - [ ] `DoubleLinkedList`
 - [x] `Range` / `NumericRange`
-- [ ] `Vector`
+- [x] `Vector`
 - [x] `HashMap`
 - [x] `TreeMap`
 - [ ] `IntMap` / `LongMap` (?)
@@ -56,7 +56,7 @@ See the [CONTRIBUTING](CONTRIBUTING.md) file.
 - [x] `ListSet`
 - [x] `TreeSet`
 - [ ] `EqSet`
-- [ ] `BitSet`
+- [x] `BitSet`
 - [x] `View`
 - [x] `Spandex` (new immutable indexed sequence)
 
@@ -72,6 +72,8 @@ See the [CONTRIBUTING](CONTRIBUTING.md) file.
 - [x] `foldLeft`
 - [x] `foldRight`
 - [x] `get`
+- [x] `getOrElse`
+- [x] `getOrElseUpdate`
 - [x] `head`
 - [x] `indexWhere`
 - [x] `isDefinedAt`
@@ -90,7 +92,7 @@ See the [CONTRIBUTING](CONTRIBUTING.md) file.
 - [x] `dropRight`
 - [x] `empty`
 - [x] `filter` / `filterNot`
-- [ ] `groupBy`
+- [x] `groupBy`
 - [x] `intersect`
 - [x] `partition`
 - [x] `range`
@@ -101,10 +103,12 @@ See the [CONTRIBUTING](CONTRIBUTING.md) file.
 - [x] `init`
 - [x] `take`
 - [x] `takeRight`
-- [x] `updated`
 
 ### Transformations to collections that can have a different element type
 
+- [x] `updated`
+- [x] `prepend`
+- [x] `append`
 - [x] `++` / `concat` / `union`
 - [x] `flatMap`
 - [x] `map`

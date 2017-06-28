@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class ImmutableArrayBenchmark {
 
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17", "39", "282", "4096", "31999"/*, "73121", "7312102"*/))
+  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "7312102"))
   var size: Int = _
 
   var xs: ImmutableArray[Long] = _
@@ -34,7 +34,7 @@ class ImmutableArrayBenchmark {
   }
 
   @Benchmark
-    //@OperationsPerInvocation(size)
+  //  @OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
     var ys = ImmutableArray.empty[Long]
     var i = 0L
@@ -69,7 +69,7 @@ class ImmutableArrayBenchmark {
   def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
-    //@OperationsPerInvocation(size)
+  //  @OperationsPerInvocation(size)
   def foreach_while(bh: Blackhole): Unit = {
     var i = 0
     while (i < xs.size) {
@@ -128,4 +128,12 @@ class ImmutableArrayBenchmark {
       bh.consume(n)
       acc - 1
   })
+
+  @Benchmark
+  def groupBy(bh: Blackhole): Unit = {
+    val result = xs.groupBy(_ % 5)
+    bh.consume(result)
+  }
+
+
 }
