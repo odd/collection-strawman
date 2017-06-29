@@ -2,7 +2,7 @@ package strawman
 package collection.immutable
 
 import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
-import strawman.collection.{IterableFactory, IterableFactoryWithBuilder, IterableOnce, Iterator, StrictOptimizedIterableOps, View}
+import strawman.collection.{IterableFactory, IterableOnce, Iterator, StrictOptimizedIterableOps, View}
 
 import scala.{Any, Boolean, Int, Nothing}
 import scala.runtime.ScalaRunTime
@@ -80,7 +80,7 @@ class ImmutableArray[+A] private[collection] (private val elements: scala.Array[
 
   override def partition(p: A => Boolean): (ImmutableArray[A], ImmutableArray[A]) = {
     val pn = View.Partition(coll, p)
-    (ImmutableArray.fromIterable(pn.left), ImmutableArray.fromIterable(pn.right))
+    (ImmutableArray.fromIterable(pn.first), ImmutableArray.fromIterable(pn.second))
   }
 
   override def take(n: Int): ImmutableArray[A] = ImmutableArray.tabulate(n)(apply)
@@ -102,18 +102,20 @@ class ImmutableArray[+A] private[collection] (private val elements: scala.Array[
 
 }
 
-object ImmutableArray extends IterableFactoryWithBuilder[ImmutableArray] {
+object ImmutableArray extends IterableFactory[ImmutableArray] {
 
   private[this] lazy val emptyImpl = new ImmutableArray[Nothing](new scala.Array[Any](0))
 
   def empty[A]: ImmutableArray[A] = emptyImpl
 
+  def fromArrayBuffer[A](arr: ArrayBuffer[A]): ImmutableArray[A] =
+    new ImmutableArray[A](arr.asInstanceOf[ArrayBuffer[Any]].toArray)
+
   def fromIterable[A](it: strawman.collection.Iterable[A]): ImmutableArray[A] =
-    new ImmutableArray(ArrayBuffer.fromIterable(it).asInstanceOf[ArrayBuffer[Any]].toArray)
+    fromArrayBuffer(ArrayBuffer.fromIterable(it))
 
   def newBuilder[A](): Builder[A, ImmutableArray[A]] =
-    new GrowableBuilder(ArrayBuffer.empty[A])
-      .mapResult(b => new ImmutableArray[A](b.asInstanceOf[ArrayBuffer[Any]].toArray))
+    ArrayBuffer.newBuilder[A]().mapResult(fromArrayBuffer)
 
   override def fill[A](n: Int)(elem: => A): ImmutableArray[A] = tabulate(n)(_ => elem)
 

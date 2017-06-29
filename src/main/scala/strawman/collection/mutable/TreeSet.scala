@@ -1,7 +1,7 @@
 package strawman
 package collection.mutable
 
-import collection.{SortedIterableFactory, SortedIterableFactoryWithBuilder, StrictOptimizedIterableOps}
+import collection.{SortedIterableFactory, StrictOptimizedIterableOps}
 import collection.mutable.{RedBlackTree => RB}
 
 import scala.{Boolean, Int, None, Null, NullPointerException, Option, Ordering, SerialVersionUID, Serializable, Some, Unit}
@@ -44,9 +44,11 @@ sealed class TreeSet[A] private (tree: RB.Tree[A, Null])(implicit val ordering: 
 
   protected[this] def fromSpecificIterable(coll: collection.Iterable[A]): TreeSet[A] = TreeSet.sortedFromIterable(coll)
 
-  protected[this] def newSpecificBuilder(): Builder[A, TreeSet[A]] = new GrowableBuilder(TreeSet.empty[A])
+  protected[this] def newSpecificBuilder(): Builder[A, TreeSet[A]] = TreeSet.newBuilder()
 
   def iterableFactory = Set
+
+  def sortedIterableFactory = TreeSet
 
   def keysIteratorFrom(start: A): collection.Iterator[A] = RB.keysIterator(tree, Some(start))
 
@@ -150,7 +152,7 @@ sealed class TreeSet[A] private (tree: RB.Tree[A, Null])(implicit val ordering: 
     }
 
     override def last = lastOption.get
-    /*override*/ def lastOption = {
+    override def lastOption = {
       val elem = if (until.isDefined) RB.maxKeyBefore(tree, until.get) else RB.maxKey(tree)
       (elem, from) match {
         case (Some(e), Some(fr)) if ordering.compare(e, fr) < 0 => None
@@ -183,5 +185,7 @@ object TreeSet extends SortedIterableFactory[TreeSet] {
   def empty[A : Ordering]: TreeSet[A] = new TreeSet[A]()
 
   def sortedFromIterable[E : Ordering](it: collection.Iterable[E]): TreeSet[E] = Growable.fromIterable(empty[E], it)
+
+  def newBuilder[A: Ordering](): Builder[A, TreeSet[A]] = new GrowableBuilder(empty[A])
 
 }
