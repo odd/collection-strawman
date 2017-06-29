@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class VectorBenchmark {
 
-  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "7312102"))
+  @Param(scala.Array("0"/*, "1", "2", "3", "4"*/, "7", "8"/*, "15", "16"*/, "17", "39", "282", "73121"/*, "7312102"*/))
   var size: Int = _
 
   var xs: Vector[Long] = _
@@ -81,7 +81,7 @@ class VectorBenchmark {
   @Benchmark
   def iterator(bh: Blackhole): Any = {
     var n = 0
-    val it = xs.iterator
+    val it = xs.iterator()
     while (it.hasNext) {
       bh.consume(it.next())
       n += 1

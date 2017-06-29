@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class ImmutableArrayBenchmark {
 
-  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "7312102"))
+  @Param(scala.Array("0"/*, "1", "2", "3", "4"*/, "7", "8"/*, "15", "16"*/, "17", "39", "282", "73121"/*, "7312102"*/))
   var size: Int = _
 
   var xs: ImmutableArray[Long] = _
@@ -39,7 +39,7 @@ class ImmutableArrayBenchmark {
     var ys = ImmutableArray.empty[Long]
     var i = 0L
     while (i < size) {
-      ys = ys :+ i
+      ys = i +: ys
       i = i + 1
     }
     bh.consume(ys)

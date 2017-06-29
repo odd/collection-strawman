@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class PrimitiveArrayBenchmark {
 
-  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "7312102"))
+  @Param(scala.Array("0"/*, "1", "2", "3", "4"*/, "7", "8"/*, "15", "16"*/, "17", "39", "282", "73121"/*, "7312102"*/))
   var size: Int = _
 
   var xs: ImmutableArray[Int] = _
@@ -34,12 +34,24 @@ class PrimitiveArrayBenchmark {
   }
 
   @Benchmark
-  //  @OperationsPerInvocation(size)
+  //@OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
     var ys = ImmutableArray.empty[Int]
     var i = 0
     while (i < size) {
-      ys = ys :+ i
+      ys = i +: ys // Note: In the case of TreeSet, always inserting elements that are already ordered creates a bias
+      i = i + 1
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
+  //@OperationsPerInvocation(size)
+  def snoc(bh: Blackhole): Unit = {
+    var ys = ImmutableArray.empty[Int]
+    var i = 0
+    while (i < size) {
+      ys = ys :+ i // Note: In the case of TreeSet, always inserting elements that are already ordered creates a bias
       i = i + 1
     }
     bh.consume(ys)
@@ -47,6 +59,9 @@ class PrimitiveArrayBenchmark {
 
   @Benchmark
   def uncons(bh: Blackhole): Unit = bh.consume(xs.tail)
+
+  @Benchmark
+  def unsnoc(bh: Blackhole): Unit = bh.consume(xs.init)
 
   @Benchmark
   def concat(bh: Blackhole): Unit = bh.consume(xs ++ xs)
