@@ -8,7 +8,7 @@ import scala.Predef.{String, genericWrapArray}
 import scala.math
 import scala.reflect.ClassTag
 import scala.runtime.ScalaRunTime
-import strawman.collection.{IterableFactory, IterableFactoryWithBuilder, IterableOnce, Iterator, LinearSeq, View}
+import strawman.collection.{IterableFactory, IterableOnce, Iterator, LinearSeq, View}
 import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
 
 /**
@@ -298,7 +298,7 @@ sealed abstract class Spandex[+A] private (protected val index: Int, lengthVecto
   override final def className = "Spandex"
 }
 
-object Spandex extends IterableFactoryWithBuilder[Spandex] {
+object Spandex extends IterableFactory[Spandex] {
   private[immutable] class Primary[+A](
         override val elements: scala.Array[Any],
         index: Int,
