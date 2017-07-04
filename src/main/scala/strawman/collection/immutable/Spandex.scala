@@ -24,12 +24,14 @@ import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
   * The underlying array is only mutated on <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and
   * <code>concat</code> but never more than once for any given position (any later modification attempts to an already modified position
   * results in a copy being made of the underlying array).
+  * <br/>
+  * <br/>
   * To guarantee that only a single thread can write to an array slot a pair of atomic integers are used to guard the low and high
   * assignments in <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and <code>concat</code>.
   * <br/>
   * <br/>
   * Expansion occurs when the underlying array is full on the effected side; the new array will be populated to have its start position
-  * adjusted by the unused capacity (margin) on the non effected side. This expansion scheme leads to more free slots being allocated on
+  * adjusted proportionally to the unused capacity (margin) on the non effected side. This expansion scheme leads to more free slots being allocated on
   * the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides with a right side bias if the
   * free slot count is odd).
   */
