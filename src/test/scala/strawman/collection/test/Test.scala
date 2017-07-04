@@ -87,8 +87,6 @@ class StrawmanTest {
     val y1: String = x1
     val x2 = xs.foldRight("")(_ + _)
     val y2: String = x2
-    val x3 = xs.indexWhere(_ % 2 == 0)
-    val y3: Int = x3
     val x4 = xs.head
     val y4: Int = x4
     val x5 = xs.to(List)
@@ -123,7 +121,6 @@ class StrawmanTest {
     println("-------")
     println(x1)
     println(x2)
-    println(x3)
     println(x4)
     println(x5)
     println(xs6.to(List))
@@ -473,6 +470,22 @@ class StrawmanTest {
     println(xs17.to(List))
     println(xs19)
     println(xs19.to(List))
+
+    // laziness may differ in dotty, so test only that we are as lazy as Stream
+    import scala.collection.{immutable => old}
+    lazy val fibsStream: old.Stream[Int] = 0 #:: 1 #:: fibsStream.zip(fibsStream.tail).map { n => n._1 + n._2 }
+    if(old.List(0,1,1,2)==fibsStream.take(4).toList) {
+      lazy val fibs: LazyList[Int] = 0 #:: 1 #:: fibs.zip(fibs.tail).map { n => n._1 + n._2 }
+      assert(List(0, 1, 1, 2) == fibs.take(4).to(List))
+    }
+
+    var lazeCountS = 0
+    var lazeCountL = 0
+    def lazeL(i: Int) = {lazeCountL += 1; i}
+    def lazeS(i: Int) = {lazeCountS += 1; i}
+    val xs20 = lazeS(1) #:: lazeS(2) #:: lazeS(3) #:: old.Stream.empty
+    val xs21 = lazeL(1) #:: lazeL(2) #:: lazeL(3) #:: LazyList.empty
+    assert(lazeCountS==lazeCountL)
   }
 
   def equality(): Unit = {
@@ -530,6 +543,8 @@ class StrawmanTest {
     val xs9t: mutable.HashMap[Int, String] = xs9
     val xs10 = xs1 ++ xs2
     val xs11: immutable.SortedMap[String, Int] = xs10
+    val xs12 = xs11.collect({ case (k, v) if k.length == v => (v, k) }: scala.PartialFunction[(String, Int), (Int, String)])
+    val xs13: immutable.SortedMap[Int, String] = xs12
   }
 
   def bitSets(xs: immutable.BitSet, ys: BitSet, zs: Set[Int]): Unit = {

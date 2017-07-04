@@ -16,6 +16,8 @@ trait View[+A] extends Iterable[A] with IterableOps[A, View, View[A]] {
   protected[this] def newSpecificBuilder(): Builder[A, View[A]] =
     immutable.IndexedSeq.newBuilder().mapResult(_.view)
 
+  override def toString = "View(?)"
+
   override def className = "View"
 }
 
@@ -227,6 +229,23 @@ object View extends IterableFactory[View] {
         def iterator(): Iterator[A2] = underlying.iterator().map(_._2)
         override def knownSize: Int = underlying.knownSize
       }
+  }
+
+  case class PadTo[A](underlying: Iterable[A], len: Int, elem: A) extends View[A] {
+    def iterator(): Iterator[A] = new Iterator[A] {
+      private var i = 0
+      private var it = underlying.iterator()
+      def next(): A = {
+        val a =
+          if (it.hasNext) it.next()
+          else if (i < len) elem
+          else Iterator.empty.next()
+        i += 1
+        a
+      }
+      def hasNext: Boolean = i < len
+    }
+    override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize max len else -1
   }
 
 }
