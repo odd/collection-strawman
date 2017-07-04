@@ -33,7 +33,7 @@ import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
   * the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides with a right side bias if the
   * free slot count is odd).
   */
-sealed abstract class Spandex[+A] private (protected val index: Int, lengthVector: Int)
+sealed abstract class Spandex[+A] private (private val index: Int, lengthVector: Int)
     extends Seq[A]
     with LinearSeq[A]
     with IndexedSeq[A]
@@ -258,8 +258,8 @@ sealed abstract class Spandex[+A] private (protected val index: Int, lengthVecto
       case (acc, x) => op(x, acc)
     }
 
-  override final def indexWhere(p: (A) => Boolean): Int = {
-    var i = 0
+  override final def indexWhere(p: (A) => Boolean, from: Int = 0): Int = {
+    var i = from
     while (i < length) {
       if (p(fetch(i))) return i
       i += 1
