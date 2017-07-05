@@ -3,7 +3,7 @@ package collection
 package immutable
 
 import java.util.concurrent.atomic.AtomicInteger
-import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, Int, Nothing, StringContext, Unit, `inline`}
+import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, Int, NoSuchElementException, Nothing, StringContext, Unit, `inline`}
 import scala.Predef.{String, genericWrapArray}
 import scala.math
 import scala.reflect.ClassTag
@@ -215,6 +215,7 @@ sealed abstract class Spandex[+A] private (private val index: Int, lengthVector:
       private[this] var i = index + Spandex.this.length
       override def hasNext: Boolean = i > index
       override def next(): A = {
+        if (!hasNext) throw new NoSuchElementException("next on empty iterator")
         i -= 1
         element(i)
       }
@@ -223,6 +224,7 @@ sealed abstract class Spandex[+A] private (private val index: Int, lengthVector:
         private[this] var i = index
         override final def hasNext: Boolean = i < n
         override final def next(): A = {
+          if (!hasNext) throw new NoSuchElementException("next on empty iterator")
           val j = i
           i += 1
           element(j)
