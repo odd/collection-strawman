@@ -47,22 +47,30 @@ sealed abstract class Spandex[+A] private (private val index: Int, lengthVector:
 
   override def toString = toDebugString
 
+  // Could be private but for test case access
   private[immutable] def primary: Spandex.Primary[A]
 
   protected def elements: Array[Any] = primary.elements
 
-  private[immutable] def isReversed: Boolean = lengthVector < 0
+  // The lengthVector field is used to represent both length and direction (if negative the Spandex is reversed)
+  // Should be able to annotate this method as @`inline` but that makes concat tests case fail on Dotty... ^:-/
+  //@`inline`
+  private[Spandex] def isReversed: Boolean = lengthVector < 0
 
+  @`inline`
   protected final def element(i: Int): A =
     ScalaRunTime.array_apply(elements, i).asInstanceOf[A]
 
-  protected final def index(i: Int): Int =
+  @`inline`
+  private[this] final def index(i: Int): Int =
     if (isReversed) index + (length - 1) - i
     else index + i
 
+  @`inline`
   private[this] final def fetch(i: Int): A = element(index(i))
 
-  final def length: Int = if (lengthVector >= 0) lengthVector else -lengthVector
+  // The lengthVector field is used to represent both length and direction (if negative the Spandex is reversed)
+  override final def length: Int = if (lengthVector >= 0) lengthVector else -lengthVector
 
   override final def size: Int = length
 
