@@ -5,9 +5,11 @@ package test
 
 import org.junit.Assert._
 import org.junit.Test
-import scala.{Int, Unit, Nothing}
-import scala.Predef.{identity}
+
+import scala.{Exception, Int, NoSuchElementException, Nothing, Unit}
+import scala.Predef.identity
 import scala.util.Try
+import scala.util.control.NonFatal
 
 class SpandexTest {
   @Test
@@ -409,6 +411,28 @@ class SpandexTest {
     assertTrue(
       "subs iterator has correct elements",
       it3.sameElements(List(a1, a2, b)))
+
+    // Test iterator index bounds checking
+    it = Spandex.empty[Int].iterator()
+    try {
+      it.next()
+      fail("should be out of bounds")
+    } catch {
+      case _: NoSuchElementException => // expected
+      case NonFatal(_) => fail("wrong exception")
+    }
+
+    it = Spandex(1, 2, 3, 4).dropRight(1).iterator()
+    try {
+      it.next()
+      it.next()
+      it.next()
+      it.next() // should be out of bounds
+      fail("should be out of bounds")
+    } catch {
+      case _: NoSuchElementException => // expected
+      case NonFatal(_) => fail("wrong exception")
+    }
   }
 
   @Test
