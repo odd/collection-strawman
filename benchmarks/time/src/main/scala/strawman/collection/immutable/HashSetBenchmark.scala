@@ -46,18 +46,6 @@ class HashSetBenchmark {
   }
 
   @Benchmark
-  //@OperationsPerInvocation(size)
-  def snoc(bh: Blackhole): Unit = {
-    var ys = HashSet.empty[Long]
-    var i = 0L
-    while (i < size) {
-      ys = ys + i // Note: In the case of TreeSet, always inserting elements that are already ordered creates a bias
-      i = i + 1
-    }
-    bh.consume(ys)
-  }
-
-  @Benchmark
   def uncons(bh: Blackhole): Unit = bh.consume(xs.tail)
 
   @Benchmark

@@ -128,4 +128,23 @@ class VectorBenchmark {
       bh.consume(n)
       acc - 1
   })
+
+  @Benchmark
+  def groupBy(bh: Blackhole): Unit = {
+    val result = xs.groupBy(_ % 5)
+    bh.consume(result)
+  }
+
+  @Benchmark
+  //@OperationsPerInvocation(size)
+  def consSnoc(bh: Blackhole): Unit = {
+    var ys = Vector.empty[Long]
+    var i = 0L
+    while (i < size) {
+      if ((i & 1) == 1) ys = ys :+ i
+      else ys = i +: ys
+      i = i + 1
+    }
+    bh.consume(ys)
+  }
 }

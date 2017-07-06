@@ -136,4 +136,16 @@ class ScalaListBenchmark {
     bh.consume(result)
   }
 
+  @Benchmark
+  //@OperationsPerInvocation(size)
+  def consSnoc(bh: Blackhole): Unit = {
+    var ys = scala.List.empty[Long]
+    var i = 0L
+    while (i < size) {
+      if ((i & 1) == 1) ys = ys :+ i
+      else ys = i +: ys
+      i = i + 1
+    }
+    bh.consume(ys)
+  }
 }
