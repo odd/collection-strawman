@@ -568,7 +568,15 @@ class StrawmanTest {
   }
 
   @Test
-  def mainTest: Unit = {
+  def linearSeqSize(): Unit = {
+    val list = 1 :: 2 :: 3 :: Nil
+    assert(list.length == list.size && list.size == 3)
+    val lazyList = 1 #:: 2 #:: 3 #:: LazyList.Empty
+    assert(lazyList.length == lazyList.size && lazyList.size == 3)
+  }
+
+  @Test
+  def mainTest(): Unit = {
     val ints = List(1, 2, 3)
     val intsVec = ints.to(Vector)
     val intsLzy = ints.to(LazyList)
@@ -593,5 +601,6 @@ class StrawmanTest {
     lazyListOps(intsLzy)
     spandexOps(Spandex(1, 2, 3))
     equality()
+    linearSeqSize()
   }
 }
