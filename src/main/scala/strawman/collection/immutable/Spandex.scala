@@ -2,17 +2,18 @@ package strawman
 package collection
 package immutable
 
-import java.util.concurrent.atomic.AtomicInteger
-import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, Int, NoSuchElementException, Nothing, StringContext, Unit, `inline`}
-import scala.Predef.{String, genericWrapArray}
+import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
+import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, Int, Long, NoSuchElementException, UnsupportedOperationException, Nothing, StringContext, Unit, `inline`}
+import scala.Predef.{String, genericWrapArray, intWrapper}
 import scala.math
+import scala.math._
 import scala.reflect.ClassTag
 import scala.runtime.ScalaRunTime
 import strawman.collection.{IterableFactory, IterableOnce, Iterator, LinearSeq, View}
 import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
 
 /**
-  * A <i>Spandex</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
+  * A <i>Spandex_Z</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
   * <ul>
   * <li>constant time <code>head</code>, <code>last</code>, <code>tail</code>, <code>init</code>, <code>take</code>, <code>takeRight</code>, <code>drop</code>, <code>dropRight</code>, <code>slice</code> and <code>reverse</code></li>
   * <li>amortised constant time <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and <code>concat</code> (depending on the complexity of <code>java.lang.System.arraycopy</code>)</li>
@@ -21,6 +22,7 @@ import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
   * <li>reasonable memory usage (approximately double that of an array with the same number of elements)
   * </ul>
   * <br/>
+  * To allow efficient prepend/prependAll (in addition to append/appendAll)
   * The underlying array is only mutated on <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and
   * <code>concat</code> but never more than once for any given position (any later modification attempts to an already modified position
   * results in a copy being made of the underlying array).
@@ -30,13 +32,24 @@ import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
   * assignments in <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and <code>concat</code>.
   * <br/>
   * <br/>
-  * Expansion occurs when the underlying array is full on the effected side; the new array will be populated to have its start position
-  * adjusted proportionally to the unused capacity (margin) on the non effected side. This expansion scheme leads to more free slots being allocated on
-  * the side mostly expanded (a margin of zero will allocate an equal amount of free slots on both sides with a right side bias if the
-  * free slot count is odd).
+  * Expansion occurs when the underlying array is to small to allow the specified element or elements to be added.
+  *
+  * <h1>Exsamples</h1>
+  * Spandex()                                               ==> ([], 0, 0)
+  * Spandex() :+ a                                          ==> ([a, _, _, _, _, _, _, _], 0, 1)
+  * a +: Spandex()                                          ==> ([_, _, _, _, _, _, _, a], -1, 0)
+  * Spandex() :++ Seq(a, b, c, d)                           ==> ([a, b, c, d, _, _, _, _], 0, 4)
+  * Seq(a, b, c, d) ++: Spandex()                           ==> ([_, _, _, _, a, b, c, d], -4, 0)
+  * Seq(a, b, c, d) ++: Spandex() :++ Seq(e, f, g, h)       ==> ([e, f, g, h, a, b, c, d], -4, 4)
+  * Spandex(a, b, c, d, e, f, g, h)                         ==> ([a, b, c, d, e, f, g, h], 0, 8)
+  * Spandex() :++ Seq(a, b, c, d, e, f, g, h)               ==> ([a, b, c, d, e, f, g, h], 0, 8)
+  * Seq(a, b, c, d, e, f, g, h) ++: Spandex()               ==> ([a, b, c, d, e, f, g, h], -8, 0)
+  * (Seq(a, b, c, d) ++: Spandex()).slice(1, 3)             ==> ([_, _, _, _, a, b, c, d], -3, -1)
+  * (Spandex() :++ Seq(a, b, c, d)).slice(1, 3)             ==> ([a, b, c, d, _, _, _, _], 1, 3)
+  * (Seq(a, b) ++: Spandex() :++ Seq(c, d)).slice(1, 3)     ==> ([c, d, _, _, _, _, a, b], -1, 1)
   */
-sealed abstract class Spandex[+A] private (private val index: Int, lengthVector: Int)
-    extends Seq[A]
+sealed abstract class Spandex[+A] private (protected val start: Int, protected val stop: Int)
+  extends Seq[A]
     with LinearSeq[A]
     with IndexedSeq[A]
     with LinearSeqOps[A, Spandex, Spandex[A]]
@@ -52,31 +65,51 @@ sealed abstract class Spandex[+A] private (private val index: Int, lengthVector:
 
   protected def elements: Array[Any] = primary.elements
 
-  // The lengthVector field is used to represent both length and direction (if negative the Spandex is reversed)
-  // Should be able to annotate this method as @`inline` but that makes concat tests case fail on Dotty... ^:-/
-  //@`inline`
-  private[Spandex] def isReversed: Boolean = lengthVector < 0
+  protected def capacity: Int = elements.length
+
+  //@`inline` // Causes problems with errors and eternal inlining when running test cases on Dotty
+  private def isReversed: Boolean = start > stop
+
+  @`inline`
+  private def frontIndexes = {
+    if (start < 0 && stop <= 0) (capacity + start, capacity + stop)
+    else if (start < 0) (capacity + start, capacity)
+    else if (stop < 0) (capacity + stop, capacity)
+    else (0, 0)
+  }
+
+  @`inline`
+  private def rearIndexes = {
+    if (start >= 0 && stop > 0) (start, stop)
+    else if (stop > 0) (0, stop)
+    else if (start > 0) (0, start)
+    else (0, 0)
+  }
 
   @`inline`
   protected final def element(i: Int): A =
     ScalaRunTime.array_apply(elements, i).asInstanceOf[A]
 
   @`inline`
-  private[this] final def index(i: Int): Int =
-    if (isReversed) index + (length - 1) - i
-    else index + i
+  protected final def index(i: Int): Int =
+    if (i < 0) capacity + i
+    else i
 
   @`inline`
-  private[this] final def fetch(i: Int): A = element(index(i))
+  private[this] final def position(i: Int): Int =
+    if (isReversed) index(start - i - 1)
+    else index(start + i)
 
-  // The lengthVector field is used to represent both length and direction (if negative the Spandex is reversed)
-  override final def length: Int = if (lengthVector >= 0) lengthVector else -lengthVector
+  @`inline`
+  private[this] final def fetch(i: Int): A = element(position(i))
+
+  override final def length: Int = Spandex.distance(start, stop)
 
   override final def size: Int = length
 
   override final def knownSize: Int = length
 
-  override final def isEmpty: Boolean = length == 0
+  override final def isEmpty: Boolean = start == 0 && stop == 0
 
   override final def nonEmpty: Boolean = !isEmpty
 
@@ -84,65 +117,75 @@ sealed abstract class Spandex[+A] private (private val index: Int, lengthVector:
     if (i < 0 || i >= length) throw new ArrayIndexOutOfBoundsException(i)
     else fetch(i)
 
-  override final def head: A = apply(0)
-
-  override final def last: A = apply(length - 1)
-
   override final def slice(from: Int, until: Int): Spandex[A] =
     if (until <= from) Spandex.empty
-    else
-      new Spandex.Secondary[A](
-        primary,
-        if (isReversed) index(math.min(until, length)) + 1 else index(math.min(from, length)),
-        until - from,
-        isReversed)
+    else {
+      val f = (from max 0) max 0
+      val u = (until min length) max 0
+      if (isReversed) new Spandex.Secondary[A](primary, start - f, start - u)
+      else new Spandex.Secondary[A](primary, start + f, start + u)
+    }
 
   override final def take(n: Int): Spandex[A] =
-    slice(0, math.min(n, length))
+    slice(0, (n min length) max 0)
 
   override final def takeRight(n: Int): Spandex[A] =
-    slice(length - math.min(n, length), length)
+    slice(length - (n min length) max 0, length)
 
   override final def drop(n: Int): Spandex[A] =
     slice(n, length)
 
-  override final def dropRight(n: Int): Spandex[A] =
-    slice(0, length - math.min(n, length))
+  override final def dropRight(n: Int): Spandex[A] = {
+    val l = length
+    slice(0, l - (n min l))
+  }
+
+  override final def head: A =
+    if (isEmpty) throw new UnsupportedOperationException
+    else fetch(0)
+
+  override final def tail: Spandex[A] =
+    if (isEmpty) throw new UnsupportedOperationException
+    else drop(1)
+
+  override final def last: A =
+    if (isEmpty) throw new UnsupportedOperationException
+    else fetch(length - 1)
+
+  override final def init: Spandex[A] =
+    if (isEmpty) throw new UnsupportedOperationException
+    else dropRight(1)
 
   final def trim(): Spandex[A] =
     if (length == 0) Spandex.Empty
-    else if (length == elements.length) Spandex.wrap(elements)
-    else {
-      val array = new Array[Any](length)
-      java.lang.System.arraycopy(elements, index, array, 0, length)
-      new Spandex.Primary[A](array, 0, length)
-    }
+    else if (length == capacity) this
+    else resize(length)
 
-  override final def prepend[B >: A](b: B): Spandex[B] =
-    if (isEmpty) Spandex(b)
-    else if (isReversed && primary.raise(b, index, length))
-      new Spandex.Secondary[B](primary, index, length + 1, isReversed)
-    else if (!isReversed && primary.lower(b, index, length))
-      new Spandex.Secondary[B](primary, index - 1, length + 1, isReversed)
-    else {
-      Spandex.expand(length + 1, elements.length - primary.high.get() - 1) {
-        case k if k == 0 ⇒ b
-        case k ⇒ fetch(k - 1)
-      }
-    }
+  private def resize(capacity: Int) = {
+    val array = new Array[Any](capacity)
+    val (frontStartIndex, frontStopIndex) = frontIndexes
+    val (rearStartIndex, rearStopIndex) = rearIndexes
+    if (rearStopIndex > 0) java.lang.System.arraycopy(elements, rearStartIndex, array, 0, rearStopIndex - rearStartIndex)
+    if (frontStopIndex > 0) java.lang.System.arraycopy(elements, frontStartIndex, array, array.length - (frontStopIndex - frontStartIndex), frontStopIndex - frontStartIndex)
+    if (isReversed) new Spandex.Primary[A](array, -(frontStopIndex - frontStartIndex), rearStopIndex - rearStartIndex).reverse
+    else new Spandex.Primary[A](array, -(frontStopIndex - frontStartIndex), rearStopIndex - rearStartIndex)
+  }
 
-  override final def append[B >: A](b: B): Spandex[B] =
-    if (isEmpty) Spandex(b)
-    else if (isReversed && primary.lower(b, index, length))
-      new Spandex.Secondary[B](primary, index - 1, length + 1, isReversed)
-    else if (!isReversed && primary.raise(b, index, length))
-      new Spandex.Secondary[B](primary, index, length + 1, isReversed)
-    else {
-      Spandex.expand(length + 1, -primary.low.get()) {
-        case k if k == length ⇒ b
-        case k ⇒ fetch(k)
-      }
-    }
+  override final def prepend[B >: A](elem: B): Spandex[B] =
+    if (isEmpty) Spandex(elem)
+    else if (isReversed && primary.appendElement(elem, start))
+      new Spandex.Secondary[B](primary, start + 1, stop)
+    else if (!isReversed && primary.prependElement(elem, start))
+      new Spandex.Secondary[B](primary, start - 1, stop)
+    else elem +: resize(Spandex.capacitate((length - 1) * 2))
+
+  override final def append[B >: A](elem: B): Spandex[B] =
+    if (isEmpty) Spandex(elem)
+    else if (isReversed && primary.prependElement(elem, stop))
+      new Spandex.Secondary[B](primary, start, stop - 1)
+    else if (!isReversed && primary.appendElement(elem, stop))
+      new Spandex.Secondary[B](primary, start, stop + 1)
+    else resize(Spandex.capacitate((length - 1) * 2)) :+ elem
 
   /** Alias for `prependAll` */
   @`inline` final def ++:[B >: A](xs: IterableOnce[B]): Spandex[B] = prependAll(xs)
@@ -151,21 +194,14 @@ sealed abstract class Spandex[+A] private (private val index: Int, lengthVector:
     xs match {
       case _ if this.isEmpty => Spandex.fromIterable(xs)
       case that: Iterable[B] if that.knownSize == 0 || that.isEmpty => this
-      case that: Spandex.Secondary[B] if that.isReversed => fromIterable(View.Concat(coll, xs))
+      case that: Spandex[B] if this.isReversed || that.isReversed => fromIterable(View.Concat(that, coll))
       case that: Spandex[B]
-        if that.primary.raise(this.elements, this.index, this.length, that.index, that.length) =>
-        new Spandex.Secondary[B](that.primary, this.index, that.length + this.length, isReversed)
+        if that.primary.appendElements(this, that.stop) =>
+        new Spandex.Secondary[B](that.primary, that.start, that.stop + this.length)
       case that: Spandex[B]
-          if this.primary.lower(that.elements, that.index, that.length, this.index, this.length) =>
-        new Spandex.Secondary[B](this.primary, this.index - that.length, this.length + that.length, isReversed)
-      case that: Spandex[B] =>
-        val size = this.size + that.size
-        val capacity = Spandex.capacitate(size)
-        val array = new Array[Any](capacity)
-        val index = (capacity - size) / 2
-        java.lang.System.arraycopy(that.elements, that.index, array, index, that.size)
-        java.lang.System.arraycopy(this.elements, this.index, array, index + that.size, this.size)
-        new Spandex.Primary[A](array, index, size)
+        if this.primary.prependElements(that, this.start) =>
+        new Spandex.Secondary[B](this.primary, this.start - that.length, this.stop)
+      case that: Spandex[B] => resize(Spandex.capacitate(this.size + that.size)).prependAll(that)
       case _ => Spandex.fromIterable(xs).concat(this)
     }
 
@@ -179,85 +215,63 @@ sealed abstract class Spandex[+A] private (private val index: Int, lengthVector:
     xs match {
       case _ if this.isEmpty => Spandex.fromIterable(xs)
       case that: Iterable[B] if that.knownSize == 0 || that.isEmpty => this
-      case _ if this.isReversed => fromIterable(View.Concat(coll, xs))
-      case that: Spandex.Secondary[B] if that.isReversed => fromIterable(View.Concat(coll, xs))
+      case that: Spandex[B] if this.isReversed || that.isReversed => fromIterable(View.Concat(coll, that))
       case that: Spandex[B]
-          if this.primary.raise(that.elements, that.index, that.length, this.index, this.length) =>
-        new Spandex.Secondary[B](this.primary, this.index, this.length + that.length, isReversed)
+        if that.primary.prependElements(this, that.start) =>
+        new Spandex.Secondary[B](that.primary, that.start - this.length, that.stop)
       case that: Spandex[B]
-          if that.primary.lower(this.elements, this.index, this.length, that.index, that.length) =>
-        new Spandex.Secondary[B](that.primary, that.index - this.length, that.length + this.length, isReversed)
-      case that: Spandex[B] =>
-        val size = this.size + that.size
-        val capacity = Spandex.capacitate(size)
-        val array = new Array[Any](capacity)
-        val index = (capacity - size) / 2
-        java.lang.System.arraycopy(this.elements, this.index, array, index, this.size)
-        java.lang.System.arraycopy(that.elements, that.index, array, index + this.size, that.size)
-        new Spandex.Primary[A](array, index, size)
-      case _ => fromIterable(View.Concat(coll, xs))
+        if this.primary.appendElements(that, this.stop) =>
+        new Spandex.Secondary[B](this.primary, this.start, this.stop + that.length)
+      case that: Spandex[B] => resize(Spandex.capacitate(this.size + that.size)).concat(that)
+      case _ => concat(Spandex.fromIterable(xs))
     }
 
   override final def map[B](f: A => B): Spandex[B] =
     if (isEmpty) Spandex.empty
     else {
-      val array = new Array[Any](elements.length)
+      val capacity = Spandex.capacitate(length)
+      val array = new Array[Any](capacity)
       var i = length - 1
       while (i >= 0) {
-        array(index + i) = f(fetch(i))
+        val j = position(i)
+        array(j) = f(element(j))
         i -= 1
       }
-      new Spandex.Primary[B](array, index, length)
+      new Spandex.Primary[B](array, start, stop)
     }
 
   override final def zip[B](xs: IterableOnce[B]): Spandex[(A, B)] = xs match {
     case that: Spandex[B] =>
-      Spandex.tabulate(math.min(this.length, that.length)) { i =>
+      Spandex.tabulate(this.length min that.length) { i =>
         (this.apply(i), that.apply(i))
       }
     case _ => fromIterable[(A, B)](View.Zip[A, B](coll, xs))
   }
 
   override final def iterator(): Iterator[A] =
-    if (isReversed) new Iterator[A] {
-      private[this] var i = index + Spandex.this.length
-      override def hasNext: Boolean = i > index
-      override def next(): A = {
+    new Iterator[A] {
+      private[this] final val n = Spandex.this.length
+      private[this] var i = 0
+      override final def hasNext: Boolean = i < n
+      override final def next(): A = {
         if (!hasNext) throw new NoSuchElementException("next on empty iterator")
-        i -= 1
-        element(i)
+        val elem = fetch(i)
+        i += 1
+        elem
       }
-    } else new Iterator[A] {
-        private[this] final val n = index + Spandex.this.length
-        private[this] var i = index
-        override final def hasNext: Boolean = i < n
-        override final def next(): A = {
-          if (!hasNext) throw new NoSuchElementException("next on empty iterator")
-          val j = i
-          i += 1
-          element(j)
-        }
-      }
+    }
 
-  override final def foreach[U](f: (A) => U): Unit =
-    if (isReversed) {
-      var i = index + length - 1
-      val n = index
-      while (i >= n) {
-        f(element(i))
-        i -= 1
-      }
-    } else {
-      var i = index
-      val n = index + length
+  override final def foreach[U](f: (A) => U): Unit = {
+      var i = 0
+      val n = length
       while (i < n) {
-        f(element(i))
+        f(fetch(i))
         i += 1
       }
     }
 
   override final def reverse: Spandex[A] =
-    new Spandex.Secondary[A](primary, index, length, !isReversed)
+    new Spandex.Secondary[A](primary, stop, start)
 
   override final def foldLeft[B](z: B)(op: (B, A) => B): B = {
     var acc = z
@@ -282,20 +296,17 @@ sealed abstract class Spandex[+A] private (private val index: Int, lengthVector:
   override final def toArray[B >: A: ClassTag]: Array[B] =
     copyToArray(new Array[B](this.length))
 
-  override final def copyToArray[B >: A](xs: Array[B], start: Int): xs.type =
+  override final def copyToArray[B >: A](array: Array[B], start: Int): array.type =
     if (start < 0 || start > length)
       throw new ArrayIndexOutOfBoundsException(start)
-    else if (isReversed) {
-      var i = start
-      val it = iterator()
-      while (it.hasNext) {
-        xs(i) = it.next()
-        i += 1
-      }
-      xs
-    } else {
-      java.lang.System.arraycopy(this.elements, this.index + start, xs, 0, this.length - start)
-      xs
+    else if (isReversed) super.copyToArray(array, start)
+    else {
+      val sliced = slice(start, length)
+      val (frontStartIndex, frontStopIndex) = sliced.frontIndexes
+      val (rearStartIndex, rearStopIndex) = sliced.rearIndexes
+      if (frontStopIndex > 0) java.lang.System.arraycopy(elements, frontStartIndex, array, 0, frontStopIndex - frontStartIndex)
+      if (rearStopIndex > 0) java.lang.System.arraycopy(elements, rearStartIndex, array, frontStopIndex - frontStartIndex, rearStopIndex - rearStartIndex)
+      array
     }
 
   override protected[this] final def fromIterable[B](c: collection.Iterable[B]): Spandex[B] = Spandex.fromIterable(c)
@@ -304,98 +315,112 @@ sealed abstract class Spandex[+A] private (private val index: Int, lengthVector:
 
   protected[this] final def fromSpecificIterable(coll: collection.Iterable[A]): Spandex[A] = fromIterable(coll)
 
-  //protected[this] final def newBuilder: Builder[A, Spandex[A]] = Spandex.newBuilder[A]()
+  //protected[this] final def newBuilder: Builder[A, Spandex_Z[A]] = Spandex_Z.newBuilder[A]()
   override protected[this] def newSpecificBuilder(): Builder[A, Spandex[A]] = Spandex.newBuilder()
 
-  override final def className = "Spandex"
+  override final def className = "Spandex_Z"
 }
 
 object Spandex extends IterableFactory[Spandex] {
   private[immutable] class Primary[+A](
-        override val elements: scala.Array[Any],
-        index: Int,
-        length: Int)
-      extends Spandex[A](index, length) {
+    override val elements: scala.Array[Any],
+    x: Int,
+    y: Int)
+    extends Spandex[A](x, y) {
 
-    def toDebugString: String = s"Primary(index: $index, length: $length, elements: ${elements.toList.zipWithIndex.map(t => s"${t._2}: ${t._1}").mkString("[", ", ", "]").replace("null", "_")})"
+    def toDebugString: String = s"${mkString("[", ", ", "]")}: Primary(start: $start, stop: $stop, elements: ${elements.toList.zipWithIndex.map(t => s"${t._2}: ${t._1}").mkString("[", ", ", "]").replace("null", "_")})"
 
-    private[Spandex] final val low: AtomicInteger = new AtomicInteger(index)
-    private[Spandex] final val high: AtomicInteger = new AtomicInteger(index + length - 1)
+    private[this] val bounds = new AtomicLong(pack(start, stop))
+
+    //@`inline`
+    private[this] def pack(low: Int, high: Int): Long = low.toLong << 32 | (high & 0xffffffffL)
+    //@`inline`
+    private[this] def unpackLow(l: Long): Int = (l >> 32).toInt
+    //@`inline`
+    private[this] def unpackHigh(l: Long): Int = l.toInt
+
+    private[Spandex] def prependElement[B >: A](elem: B, start: Int): Boolean = {
+      val bnds = bounds.get()
+      val low = unpackLow(bnds)
+      val high = unpackHigh(bnds)
+      if (Spandex.distance(low, high) == capacity) false
+      else if (low < start
+        && ((elem.isInstanceOf[AnyRef] && elem.asInstanceOf[AnyRef].eq(element(index(start - 1)).asInstanceOf[AnyRef]))
+        || (!elem.isInstanceOf[AnyRef] && elem == element(index(start - 1))))) true
+      else if (low > -capacity && low == start && bounds.compareAndSet(bnds, pack(low - 1, high))) {
+        elements(index(low - 1)) = elem
+        true
+      } else false
+    }
+
+    private[Spandex] final def prependElements[B >: A](that: Spandex[B], start: Int): Boolean = {
+      val bnds = bounds.get()
+      val low = unpackLow(bnds)
+      val high = unpackHigh(bnds)
+      val lowered = low - that.length
+      if (Spandex.distance(lowered, high) > capacity) false
+      else if (low == start && lowered >= -capacity && bounds.compareAndSet(bnds, pack(lowered, high))) {
+        val (sourceFrontStartIndex, sourceFrontStopIndex) = that.frontIndexes
+        val (sourceRearStartIndex, sourceRearStopIndex) = that.rearIndexes
+        if (sourceFrontStopIndex > 0) java.lang.System.arraycopy(that.elements, sourceFrontStartIndex, this.elements, index(lowered), sourceFrontStopIndex - sourceFrontStartIndex)
+        if (sourceRearStopIndex > 0) java.lang.System.arraycopy(that.elements, sourceRearStartIndex, this.elements, index(lowered) + sourceFrontStopIndex - sourceFrontStartIndex, sourceRearStopIndex - sourceRearStartIndex)
+        true
+      } else false
+    }
+
+    private[Spandex] def appendElement[B >: A](elem: B, stop: Int): Boolean = {
+      val bnds = bounds.get()
+      val low = unpackLow(bnds)
+      val high = unpackHigh(bnds)
+      if (Spandex.distance(low, high) == capacity) false
+      else if (high > stop
+        && ((elem.isInstanceOf[AnyRef] && elem.asInstanceOf[AnyRef].eq(element(index(stop)).asInstanceOf[AnyRef]))
+        || (!elem.isInstanceOf[AnyRef] && elem == element(index(stop))))) true
+      else if (high < capacity && high == stop && bounds.compareAndSet(bnds, pack(low, high + 1))) {
+        elements(index(high)) = elem
+        true
+      } else false
+    }
+
+    private[Spandex] final def appendElements[B >: A](that: Spandex[B], stop: Int): Boolean = {
+      val bnds = bounds.get()
+      val low = unpackLow(bnds)
+      val high = unpackHigh(bnds)
+      val raised = high + that.length
+      if (Spandex.distance(low, raised) > capacity) false
+      else if (high == stop && raised <= capacity && bounds.compareAndSet(bnds, pack(low, raised))) {
+        val (sourceFrontStartIndex, sourceFrontStopIndex) = that.frontIndexes
+        val (sourceRearStartIndex, sourceRearStopIndex) = that.rearIndexes
+        if (sourceFrontStopIndex > 0) java.lang.System.arraycopy(that.elements, sourceFrontStartIndex, this.elements, high, sourceFrontStopIndex - sourceFrontStartIndex)
+        if (sourceRearStopIndex > 0) java.lang.System.arraycopy(that.elements, sourceRearStartIndex, this.elements, high + sourceFrontStopIndex - sourceFrontStartIndex, sourceRearStopIndex - sourceRearStartIndex)
+        true
+      } else false
+    }
 
     override private[immutable] final def primary: Primary[A] = this
-
-    private[Spandex] final def lower[B >: A](b: B, i: Int, l: Int): Boolean = {
-      val lo = low.get
-      if (lo < i &&
-        ((b
-          .isInstanceOf[AnyRef] && b
-          .asInstanceOf[AnyRef]
-          .eq(elements(i - 1).asInstanceOf[AnyRef]))
-        || (!b.isInstanceOf[AnyRef] && b == element(i - 1)))) true
-      else if (lo > 0 && lo == i && low.compareAndSet(i, i - 1)) {
-        elements(i - 1) = b
-        true
-      } else false
-    }
-
-    private[Spandex] final def lower[B >: A](
-          bs: Array[B],
-          bi: Int,
-          bl: Int,
-          i: Int,
-          l: Int): Boolean = {
-      val lo = low.get
-      val j = lo - bl
-      if (lo > bl && lo == i && low.compareAndSet(lo, j)) {
-        java.lang.System.arraycopy(bs, bi, elements, j, bl)
-        true
-      } else false
-    }
-
-    private[Spandex] final def raise[B >: A](b: B, i: Int, l: Int): Boolean = {
-      val hi = high.get
-      val j = i + l
-      if (hi > (j - 1) &&
-        ((b.isInstanceOf[AnyRef] && b
-          .asInstanceOf[AnyRef]
-          .eq(elements(j).asInstanceOf[AnyRef]))
-        || (!b.isInstanceOf[AnyRef] && b == element(j)))) true
-      else if (hi < elements.length - 1 && hi == (j - 1) && high.compareAndSet(hi, j)) {
-        elements(j) = b
-        true
-      } else false
-    }
-
-    private[Spandex] final def raise[B >: A](
-          bs: Array[B],
-          bi: Int,
-          bl: Int,
-          i: Int,
-          l: Int): Boolean = {
-      val hi = high.get
-      val j = i + l
-      if (hi < elements.length - bl && hi == (j - 1) && high.compareAndSet(hi, hi + bl)) {
-        java.lang.System.arraycopy(bs, bi, elements, j, bl)
-        true
-      } else false
-    }
   }
 
   private[immutable] final class Secondary[+A](
-        override val primary: Primary[A],
-        index: Int,
-        length: Int,
-        reversed: Boolean)
-      extends Spandex[A](index, if (reversed) -length else length) {
-    def toDebugString: String = s"Secondary(index: $index, length: $length, reversed: $reversed, primary: ${primary.toDebugString})"
+    override val primary: Primary[A],
+    override val start: Int,
+    override val stop: Int)
+    extends Spandex[A](start, stop) {
+    def toDebugString: String = s"${mkString("[", ", ", "]")}: Secondary(start: $start, stop: $stop, primary: ${primary.toDebugString})"
   }
 
   private[immutable] final object Empty extends Primary[Nothing](Array.empty, 0, 0) {
-    override def toDebugString: String = s"Empty"
+    override def toDebugString: String = s"[]: Empty"
   }
 
   override def apply[A](xs: A*): Spandex[A] =
-    apply(xs.toArray[Any], 0, xs.length)
+    if (xs.isEmpty) Spandex.Empty
+    else {
+      val n = xs.length
+      val capacity = capacitate(n)
+      val array = new Array[Any](capacity)
+      xs.copyToArray(array, 0, n)
+      new Primary[A](array, 0, n)
+    }
 
   def apply[A](xs: Spandex[A]): Spandex[A] =
     xs.trim()
@@ -403,52 +428,45 @@ object Spandex extends IterableFactory[Spandex] {
   def apply[A](it: Iterable[A]): Spandex[A] =
     fromIterable(it)
 
-  private[Spandex] def capacitate(n: Int): Int = ((math.max(n, 8) + 7) / 8) * 8
-
-  private[Spandex] def apply[A](xs: Array[Any], i: Int, n: Int): Spandex[A] =
-    if (n == 0) Spandex.Empty
+  def apply[A](array: Array[A]): Spandex[A] = {
+    if (array.length == 0) Spandex.empty
     else {
-      val capacity = capacitate(n)
-      val array = new Array[Any](capacity)
-      val index = (capacity - n) / 2
-      java.lang.System.arraycopy(xs, i, array, index, n)
-      new Primary[A](array, index, n)
+      val capacity = capacitate(array.length)
+      val arr = new Array[Any](capacity)
+      java.lang.System.arraycopy(array, 0, arr, 0, array.length)
+      new Primary[A](arr, 0, array.length)
     }
-
-  /**
-    * Creates a new empty `Spandex` capable of holding the specified number of elements and initial position.
-    * @param capacity the size of the underlying array
-    * @param position the initial position in the array (default is `capacity / 2`)
-    * @tparam A the type of the elements
-    * @return an empty `Spandex` with the specified capacity and initial position
-    */
-  def create[A](capacity: Int, position: Int = -1): Spandex[A] =
-    if (capacity <= 0) Spandex.Empty
-    else {
-      val array = new Array[Any](capacity)
-      new Primary[A](array, if (position >= 0) math.min(position, capacity - 1) else capacity / 2, 0)
-    }
+  }
+  private[Spandex] def capacitate(n: Int): Int = (((n max 8) + 7) / 8) * 8
 
   def tabulate[A](n: Int)(f: Int => A): Spandex[A] =
     if (n == 0) Spandex.Empty
     else {
       val capacity = capacitate(n)
       val array = new Array[Any](capacity)
-      val first = (capacity - n) / 2
-      val last = first + n - 1
-      var i = first
-      while (i <= last) {
-        array(i) = f(i - first)
+      var i = 0
+      while (i < n) {
+        array(i) = f(i)
         i += 1
       }
-      new Primary[A](array, first, n)
+      new Primary[A](array, 0, n)
     }
 
-  private[Spandex] def expand[A](n: Int, margin: Int)(f: Int => A): Spandex[A] =
-    if (n == 0) Spandex.Empty
+  /*
+  private[Spandex_Z] def expand[A](n: Int)(f: Int => A): Spandex_Z[A] =
+    if (n == 0) Spandex_Z.Empty
     else {
       val capacity = capacitate((n - 1) * 2)
       val array = new Array[Any](capacity)
+      val (frontStartIndex, frontStopIndex) = frontIndexes
+      val (rearStartIndex, rearStopIndex) = rearIndexes
+      if (rearStopIndex > 0) java.lang.System.arraycopy(elements, rearStartIndex, array, 0, rearStopIndex - rearStartIndex)
+      if (frontStopIndex > 0) java.lang.System.arraycopy(elements, frontStartIndex, array, array.length - (frontStopIndex - frontStartIndex), frontStopIndex - frontStartIndex)
+      if (isReversed) new Spandex_Z.Primary[A](array, start, stop).reverse
+      else new Spandex_Z.Primary[A](array, start, stop)
+
+
+
       val first = (capacity - n + margin) / 2
       val last = first + n - 1
       var i = first
@@ -458,6 +476,7 @@ object Spandex extends IterableFactory[Spandex] {
       }
       new Primary[A](array, first, n)
     }
+    */
 
   override def fill[A](n: Int)(elem: => A): Spandex[A] = tabulate(n)(_ => elem)
 
@@ -476,32 +495,42 @@ object Spandex extends IterableFactory[Spandex] {
       val n = c.knownSize
       val capacity = capacitate(n)
       val array = new Array[Any](capacity)
-      val index = (capacity - n) / 2
       var i = 0
       val it = c.iterator()
       while (i < n) {
-        array(index + i) = it.next()
+        array(i) = it.next()
         i += 1
       }
-      new Spandex.Primary[A](array, index, n)
+      new Spandex.Primary[A](array, 0, n)
     case _ ⇒
-      val array = ArrayBuffer.fromIterable(it).asInstanceOf[ArrayBuffer[Any]].toArray
-      apply(array, 0, array.length)
+      val buffer = ArrayBuffer.fromIterable(it).asInstanceOf[ArrayBuffer[Any]]
+      val capacity = capacitate(buffer.size)
+      val array = new Array[Any](capacity)
+      wrap(buffer.copyToArray(array), buffer.size)
   }
 
   /**
     * Used to wrap an existing array (without copying). Observe that later modifications to the specified array will show through to the returned instance.
     * @param xs array to use for elements
     * @tparam A the element type to use
-    * @return a new instance using the specified array as element storage (or the empty spandex if the array is empty).
+    * @return a new instance using the specified array as element storage (or the empty Spandex_Z if the array is empty).
     */
-  private[strawman] def wrap[A](xs: Array[Any]): Spandex[A] =
+  private[strawman] def wrap[A](xs: Array[Any], length: Int = -1): Spandex[A] =
     if (xs.length == 0) Spandex.Empty
-    else new Primary[A](xs, 0, xs.length)
+    else new Primary[A](xs, 0, if (length > -1) length else xs.length)
 
   def newBuilder[A](): Builder[A, Spandex[A]] =
     new GrowableBuilder(ArrayBuffer.empty[A])
-      .mapResult(b => Spandex.wrap(b.asInstanceOf[ArrayBuffer[Any]].toArray))
+      .mapResult { b =>
+        val array = new Array[Any](capacitate(b.length))
+        b.asInstanceOf[ArrayBuffer[Any]].copyToArray(array)
+        Spandex.wrap(array, b.length)
+      }
 
   override def empty[A <: Any]: Spandex[A] = Spandex.Empty
+
+  @`inline`
+  private[Spandex] final def distance(x: Int, y: Int): Int =
+    if (x < y) y - x
+    else x - y
 }
