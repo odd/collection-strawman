@@ -3,7 +3,7 @@ package collection
 package immutable
 
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
-import scala.{Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, Int, Long, NoSuchElementException, UnsupportedOperationException, Nothing, StringContext, Unit, `inline`}
+import scala.{Any, AnyRef, Array, IndexOutOfBoundsException, ArrayIndexOutOfBoundsException, Boolean, Int, Long, NoSuchElementException, UnsupportedOperationException, Nothing, StringContext, Unit, `inline`}
 import scala.Predef.{String, genericWrapArray, intWrapper}
 import scala.math
 import scala.math._
@@ -13,7 +13,7 @@ import strawman.collection.{IterableFactory, IterableOnce, Iterator, LinearSeq, 
 import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
 
 /**
-  * A <i>Spandex_Z</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
+  * A <i>Spandex</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
   * <ul>
   * <li>constant time <code>head</code>, <code>last</code>, <code>tail</code>, <code>init</code>, <code>take</code>, <code>takeRight</code>, <code>drop</code>, <code>dropRight</code>, <code>slice</code> and <code>reverse</code></li>
   * <li>amortised constant time <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and <code>concat</code> (depending on the complexity of <code>java.lang.System.arraycopy</code>)</li>
@@ -22,31 +22,35 @@ import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
   * <li>reasonable memory usage (approximately double that of an array with the same number of elements)
   * </ul>
   * <br/>
-  * To allow efficient prepend/prependAll (in addition to append/appendAll)
-  * The underlying array is only mutated on <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and
-  * <code>concat</code> but never more than once for any given position (any later modification attempts to an already modified position
-  * results in a copy being made of the underlying array).
+  * Element can be added to both the front and the rear of the underlying array (via <code>prepend</code>/<code>prependAll</code>
+  * and <code>append</code>/<code>appendAll</code>/<code>concat</code> respectivly), but never more than once for any given array slot
+  * (any later modification attempts to an already modified slot results in a copy being made of the underlying array).
   * <br/>
   * <br/>
-  * To guarantee that only a single thread can write to an array slot a pair of atomic integers are used to guard the low and high
-  * assignments in <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and <code>concat</code>.
+  * To guarantee that only a single thread can write to an array slot an atomic long is used to guard the low and high index
+  * assignments.
   * <br/>
   * <br/>
-  * Expansion occurs when the underlying array is to small to allow the specified element or elements to be added.
-  *
-  * <h1>Exsamples</h1>
-  * Spandex()                                               ==> ([], 0, 0)
-  * Spandex() :+ a                                          ==> ([a, _, _, _, _, _, _, _], 0, 1)
-  * a +: Spandex()                                          ==> ([_, _, _, _, _, _, _, a], -1, 0)
-  * Spandex() :++ Seq(a, b, c, d)                           ==> ([a, b, c, d, _, _, _, _], 0, 4)
-  * Seq(a, b, c, d) ++: Spandex()                           ==> ([_, _, _, _, a, b, c, d], -4, 0)
-  * Seq(a, b, c, d) ++: Spandex() :++ Seq(e, f, g, h)       ==> ([e, f, g, h, a, b, c, d], -4, 4)
-  * Spandex(a, b, c, d, e, f, g, h)                         ==> ([a, b, c, d, e, f, g, h], 0, 8)
-  * Spandex() :++ Seq(a, b, c, d, e, f, g, h)               ==> ([a, b, c, d, e, f, g, h], 0, 8)
-  * Seq(a, b, c, d, e, f, g, h) ++: Spandex()               ==> ([a, b, c, d, e, f, g, h], -8, 0)
-  * (Seq(a, b, c, d) ++: Spandex()).slice(1, 3)             ==> ([_, _, _, _, a, b, c, d], -3, -1)
-  * (Spandex() :++ Seq(a, b, c, d)).slice(1, 3)             ==> ([a, b, c, d, _, _, _, _], 1, 3)
-  * (Seq(a, b) ++: Spandex() :++ Seq(c, d)).slice(1, 3)     ==> ([c, d, _, _, _, _, a, b], -1, 1)
+  * The default array size is eight and when the underlying array is to small to fit a requested addition a new array twice as large is allocated.
+  * <br/>
+  * <br/>
+  * <b>Examples</b>
+  * <br/>
+  <pre><code>
+    EXPRESSION                                                  (array, start, stop)
+    Spandex()                                               ==> ([], 0, 0)
+    Spandex() :+ a                                          ==> ([a, _, _, _, _, _, _, _], 0, 1)
+    a +: Spandex()                                          ==> ([_, _, _, _, _, _, _, a], -1, 0)
+    Spandex() :++ Seq(a, b, c, d)                           ==> ([a, b, c, d, _, _, _, _], 0, 4)
+    Seq(a, b, c, d) ++: Spandex()                           ==> ([_, _, _, _, a, b, c, d], -4, 0)
+    Seq(a, b, c, d) ++: Spandex() :++ Seq(e, f, g, h)       ==> ([e, f, g, h, a, b, c, d], -4, 4)
+    Spandex(a, b, c, d, e, f, g, h)                         ==> ([a, b, c, d, e, f, g, h], 0, 8)
+    Spandex() :++ Seq(a, b, c, d, e, f, g, h)               ==> ([a, b, c, d, e, f, g, h], 0, 8)
+    Seq(a, b, c, d, e, f, g, h) ++: Spandex()               ==> ([a, b, c, d, e, f, g, h], -8, 0)
+    (Seq(a, b, c, d) ++: Spandex()).slice(1, 3)             ==> ([_, _, _, _, a, b, c, d], -3, -1)
+    (Spandex() :++ Seq(a, b, c, d)).slice(1, 3)             ==> ([a, b, c, d, _, _, _, _], 1, 3)
+    (Seq(a, b) ++: Spandex() :++ Seq(c, d)).slice(1, 3)     ==> ([c, d, _, _, _, _, a, b], -1, 1)
+  </code></pre>
   */
 sealed abstract class Spandex[+A] private (protected val start: Int, protected val stop: Int)
   extends Seq[A]
@@ -293,6 +297,16 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
     -1
   }
 
+  override final def updated[B >: A](i: Int, elem: B): Spandex[B] = {
+    if (i < 0 || i >= length) throw new IndexOutOfBoundsException(i.toString)
+    else {
+      val array = new Array[Any](capacity)
+      java.lang.System.arraycopy(elements, 0, array, 0, capacity)
+      array.update(position(i), elem)
+      new Spandex.Primary[B](array, start, stop)
+    }
+  }
+
   override final def toArray[B >: A: ClassTag]: Array[B] =
     copyToArray(new Array[B](this.length))
 
@@ -315,10 +329,9 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
 
   protected[this] final def fromSpecificIterable(coll: collection.Iterable[A]): Spandex[A] = fromIterable(coll)
 
-  //protected[this] final def newBuilder: Builder[A, Spandex_Z[A]] = Spandex_Z.newBuilder[A]()
   override protected[this] def newSpecificBuilder(): Builder[A, Spandex[A]] = Spandex.newBuilder()
 
-  override final def className = "Spandex_Z"
+  override final def className = "Spandex"
 }
 
 object Spandex extends IterableFactory[Spandex] {
@@ -332,11 +345,11 @@ object Spandex extends IterableFactory[Spandex] {
 
     private[this] val bounds = new AtomicLong(pack(start, stop))
 
-    //@`inline`
+    @`inline`
     private[this] def pack(low: Int, high: Int): Long = low.toLong << 32 | (high & 0xffffffffL)
-    //@`inline`
+    @`inline`
     private[this] def unpackLow(l: Long): Int = (l >> 32).toInt
-    //@`inline`
+    @`inline`
     private[this] def unpackHigh(l: Long): Int = l.toInt
 
     private[Spandex] def prependElement[B >: A](elem: B, start: Int): Boolean = {
@@ -452,32 +465,6 @@ object Spandex extends IterableFactory[Spandex] {
       new Primary[A](array, 0, n)
     }
 
-  /*
-  private[Spandex_Z] def expand[A](n: Int)(f: Int => A): Spandex_Z[A] =
-    if (n == 0) Spandex_Z.Empty
-    else {
-      val capacity = capacitate((n - 1) * 2)
-      val array = new Array[Any](capacity)
-      val (frontStartIndex, frontStopIndex) = frontIndexes
-      val (rearStartIndex, rearStopIndex) = rearIndexes
-      if (rearStopIndex > 0) java.lang.System.arraycopy(elements, rearStartIndex, array, 0, rearStopIndex - rearStartIndex)
-      if (frontStopIndex > 0) java.lang.System.arraycopy(elements, frontStartIndex, array, array.length - (frontStopIndex - frontStartIndex), frontStopIndex - frontStartIndex)
-      if (isReversed) new Spandex_Z.Primary[A](array, start, stop).reverse
-      else new Spandex_Z.Primary[A](array, start, stop)
-
-
-
-      val first = (capacity - n + margin) / 2
-      val last = first + n - 1
-      var i = first
-      while (i <= last) {
-        array(i) = f(i - first)
-        i += 1
-      }
-      new Primary[A](array, first, n)
-    }
-    */
-
   override def fill[A](n: Int)(elem: => A): Spandex[A] = tabulate(n)(_ => elem)
 
   def fromIterable[A](it: collection.IterableOnce[A]): Spandex[A] = it match {
@@ -510,8 +497,10 @@ object Spandex extends IterableFactory[Spandex] {
   }
 
   /**
-    * Used to wrap an existing array (without copying). Observe that later modifications to the specified array will show through to the returned instance.
+    * Used to wrap an existing array (without copying). Observe that later modifications to the specified array will show
+    * through to the returned instance.
     * @param xs array to use for elements
+    * @param length the number of elements present in the array (defaults to -1 which will use the array length)
     * @tparam A the element type to use
     * @return a new instance using the specified array as element storage (or the empty Spandex_Z if the array is empty).
     */
