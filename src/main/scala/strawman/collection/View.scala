@@ -2,7 +2,7 @@ package strawman.collection
 
 import strawman.collection.mutable.{ArrayBuffer, Builder}
 
-import scala.{Any, Boolean, Equals, Int, Nothing, annotation}
+import scala.{Any, Boolean, Equals, Int, NoSuchElementException, Nothing, annotation, IndexOutOfBoundsException}
 import scala.Predef.{<:<, intWrapper}
 
 /** Concrete collection type: View */
@@ -192,10 +192,32 @@ object View extends IterableFactory[View] {
     override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize + 1 else -1
   }
 
+  /** A view that appends the elements of another collection or iterator to its elements */
+  case class AppendAll[A](underlying: Iterable[A], other: IterableOnce[A]) extends View[A] {
+    def iterator() = underlying.iterator() ++ other
+    override def knownSize = other match {
+      case other: Iterable[_] if underlying.knownSize >= 0 && other.knownSize >= 0 =>
+        underlying.knownSize + other.knownSize
+      case _ =>
+        -1
+    }
+  }
+
   /** A view that prepends an element to its elements */
   case class Prepend[A](elem: A, underlying: Iterable[A]) extends View[A] {
     def iterator(): Iterator[A] = Concat(View.Single(elem), underlying).iterator()
     override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize + 1 else -1
+  }
+
+  /** A view that prepends the elements of another collection or iterator to its elements */
+  case class PrependAll[A](other: IterableOnce[A], underlying: Iterable[A]) extends View[A] {
+    def iterator() = other.iterator() ++ underlying.iterator()
+    override def knownSize = other match {
+      case other: Iterable[_] if underlying.knownSize >= 0 && other.knownSize >= 0 =>
+        underlying.knownSize + other.knownSize
+      case _ =>
+        -1
+    }
   }
 
   case class Updated[A](underlying: Iterable[A], index: Int, elem: A) extends View[A] {
@@ -210,6 +232,65 @@ object View extends IterableFactory[View] {
           value
         }
         def hasNext: Boolean = it.hasNext
+      }
+  }
+
+  /*
+    // Implementated as bellow in scala.collection.SeqLike
+    def patch[B >: A, That](from: Int, patch: GenSeq[B], replaced: Int)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+      val b = bf(repr)
+      var i = 0
+      val it = this.iterator
+      while (i < from && it.hasNext) {
+        b += it.next()
+        i += 1
+      }
+      b ++= patch.seq
+      i = replaced
+      while (i > 0 && it.hasNext) {
+        it.next()
+        i -= 1
+      }
+      while (it.hasNext) b += it.next()
+      b.result()
+    }
+   */
+
+  case class Patched[A](underlying: Iterable[A], from: Int, other: IterableOnce[A], replaced: Int) extends View[A] {
+    if (from < 0 || from > size) throw new IndexOutOfBoundsException(from.toString)
+    def iterator(): Iterator[A] =
+      new Iterator[A] {
+        private[this] var uit = underlying.iterator()
+        private[this] var oit = other.iterator()
+        private[this] var i = 0
+        private[this] var isCurrent = false
+        private[this] var current: A = _
+        def hasNext: Boolean = isCurrent || {
+          if (i < from && uit.hasNext) {
+            i += 1
+            current = uit.next()
+            isCurrent = true
+            true
+          } else {
+            if (i == from) uit.drop(replaced)
+            i += 1
+            if (oit.hasNext) {
+              current = oit.next()
+              isCurrent = true
+              true
+            } else if (uit.hasNext) {
+              current = uit.next()
+              isCurrent = true
+              true
+            } else false
+          }
+        }
+        def next(): A = {
+          if (hasNext) {
+            isCurrent = false
+            current
+          } else throw new NoSuchElementException
+        }
       }
   }
 

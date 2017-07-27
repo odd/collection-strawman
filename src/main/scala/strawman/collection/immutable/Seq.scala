@@ -80,6 +80,21 @@ trait SeqOps[+A, +CC[_], +C] extends collection.SeqOps[A, CC, C] {
     */
   @`inline` final def :+ [B >: A](elem: B): CC[B] = append(elem)
 
+  def prependAll[B >: A](xs: IterableOnce[B]): CC[B] = fromIterable(View.PrependAll(xs, coll))
+
+  /** Alias for `prependAll`
+    *
+    * Note that :-ending operators are right associative (see example).
+    * A mnemonic for `++:` vs. `:++` is: the COLon goes on the COLlection side.
+    */
+  @`inline` final def ++:[B >: A](xs: IterableOnce[B]): CC[B] = prependAll(xs)
+
+  /** Alias for `appendAll` */
+  @`inline` final def :++[B >: A](xs: IterableOnce[B]): CC[B] = appendAll(xs)
+
+  /** Alias for `concat` */
+  @`inline` def appendAll[B >: A](xs: IterableOnce[B]): CC[B] = concat(xs)
+
   /** A copy of this $coll with one single replaced element.
     *  @param  index  the position of the replacement
     *  @param  elem   the replacing element
@@ -93,6 +108,7 @@ trait SeqOps[+A, +CC[_], +C] extends collection.SeqOps[A, CC, C] {
     */
   def updated[B >: A](index: Int, elem: B): CC[B] = fromIterable(View.Updated(coll, index, elem))
 
+  def patch[B >: A](from: Int, other: IterableOnce[B], replaced: Int = 0): CC[B] = fromIterable(View.Patched(coll, from, other, replaced))
 }
 
 object Seq extends IterableFactory.Delegate[Seq](List)

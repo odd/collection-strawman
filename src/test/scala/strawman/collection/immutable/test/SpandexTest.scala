@@ -224,6 +224,35 @@ class SpandexTest {
   }
 
   @Test
+  def testAppendAll(): Unit = {
+    assertEquals("on empty", Spandex(1, 2, 3), Spandex.empty :++ List(1, 2, 3))
+    assertEquals("on reversed empty", Spandex(1, 2, 3), Spandex.empty.reverse :++ List(1, 2, 3))
+    assertEquals("on single", Spandex(1, 2, 3, 4), Spandex(1) :++ List(2, 3, 4))
+    assertEquals("on reversed single", Spandex(1, 2, 3, 4), Spandex(1).reverse :++ List(2, 3, 4))
+    assertEquals("on multiple", Spandex(1, 2, 3, 4, 5, 6), Spandex(1, 2, 3) :++ List(4, 5, 6))
+    assertEquals("on reversed multiple", Spandex(3, 2, 1, 4, 5, 6), Spandex(1, 2, 3).reverse :++ List(4, 5, 6))
+    assertEquals("on multiple over rear", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), Spandex(1, 2, 3, 4, 5, 6, 7) :++ List(8, 9, 10, 11))
+    assertEquals("on reversed multiple over rear", Spandex(7, 6, 5, 4, 3, 2, 1, 8, 9, 10, 11), Spandex(1, 2, 3, 4, 5, 6, 7).reverse :++ List(8, 9, 10, 11))
+  }
+
+  @Test
+  def testPrependAll(): Unit = {
+    assertEquals("on empty", Spandex(1, 2, 3), List(1, 2, 3) ++: Spandex.empty)
+    assertEquals("on reversed empty", Spandex(1, 2, 3), List(1, 2, 3) ++: Spandex.empty.reverse)
+    assertEquals("on single", Spandex(1, 2, 3, 4), List(1, 2, 3) ++: Spandex(4))
+    assertEquals("on reversed single", Spandex(1, 2, 3, 4), List(1, 2, 3) ++: Spandex(4).reverse)
+    assertEquals("on multiple", Spandex(1, 2, 3, 4, 5, 6), List(1, 2, 3) ++: Spandex(4, 5, 6))
+    assertEquals("on reversed multiple", Spandex(1, 2, 3, 6, 5, 4), List(1, 2, 3) ++: Spandex(4, 5, 6).reverse)
+    assertEquals("on multiple over front", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), List(1, 2, 3, 4) ++: Spandex(5, 6, 7, 8, 9, 10, 11))
+    assertEquals("on reversed multiple over front", Spandex(1, 2, 3, 4, 11, 10, 9, 8, 7, 6, 5), List(1, 2, 3, 4) ++: Spandex(5, 6, 7, 8, 9, 10, 11).reverse)
+    assertEquals("with list on empty", Spandex(1, 2, 3), List(1, 2, 3) ++: Spandex.empty)
+    assertEquals("with iterator", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9), List(1, 2, 3, 4).iterator() ++: Spandex(5, 6, 7, 8, 9))
+    assertEquals("with iterator on reversed", Spandex(1, 2, 3, 4, 9, 8, 7, 6, 5), List(1, 2, 3, 4).iterator() ++: Spandex(5, 6, 7, 8, 9).reverse)
+    assertEquals("with multiple lists", Spandex(-3, -2, -1, 0, 1, 2, 3, 4), List(-3, -2) ++: List(-1, 0) ++: 1 +: Spandex(2, 3, 4))
+    assertEquals("with multiple lists reversed", Spandex(-3, -2, 4, 3, 2, 1, 0, -1), List(-3, -2) ++: (List(-1, 0) ++: 1 +: Spandex(2, 3, 4)).reverse)
+  }
+
+  @Test
   def testPrependAndAppendEqual(): Unit = {
     assertEquals("prepend equal on empty", Spandex(1), 1 +: (1 +: Spandex.empty).tail)
     assertEquals("append equal on empty", Spandex(1), (Spandex.empty :+ 1).take(0) :+ 1)
@@ -242,15 +271,6 @@ class SpandexTest {
     assertTrue("prepend eq primaries", b.primary eq d.primary)
     assertEquals("prepend equal", Spandex(-1, 0, 1, 2, 3), e)
     assertEquals("prepend equal", Spandex(-2, 0, 1, 2, 3), f)
-  }
-
-  @Test
-  def testPrependAll(): Unit = {
-    assertEquals("prepend all with list on empty", Spandex(1, 2, 3), List(1, 2, 3) ++: Spandex.empty)
-    assertEquals("prepend all with iterator", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9), List(1, 2, 3, 4).iterator() ++: Spandex(5, 6, 7, 8, 9))
-    assertEquals("prepend all with iterator on reversed", Spandex(1, 2, 3, 4, 9, 8, 7, 6, 5), List(1, 2, 3, 4).iterator() ++: Spandex(5, 6, 7, 8, 9).reverse)
-    assertEquals("prepend all with multiple lists", Spandex(-3, -2, -1, 0, 1, 2, 3, 4), List(-3, -2) ++: List(-1, 0) ++: 1 +: Spandex(2, 3, 4))
-    assertEquals("prepend all with multiple lists reversed", Spandex(-3, -2, 4, 3, 2, 1, 0, -1), List(-3, -2) ++: (List(-1, 0) ++: 1 +: Spandex(2, 3, 4)).reverse)
   }
 
   @Test
@@ -631,5 +651,58 @@ class SpandexTest {
     assertEquals("drop right 2 take right 2", Spandex(1, 2), Spandex(1, 2, 3, 4).dropRight(2).takeRight(2))
     assertEquals("drop right 2 take right 0", Spandex.empty, Spandex(1, 2, 3, 4).dropRight(2).takeRight(0))
     assertEquals("drop right 2 take right 2 drop right 1 take right 1", Spandex(1), Spandex(1, 2, 3, 4).dropRight(2).takeRight(2).dropRight(1).takeRight(1))
+  }
+
+  @Test
+  def testPatchToFront(): Unit = {
+    assertEquals("Empty with empty at front", Spandex.empty, Spandex.empty.patch(0, Spandex.empty))
+    assertEquals("Empty reversed with empty at front", Spandex.empty, Spandex.empty.reverse.patch(0, Spandex.empty))
+    assertEquals("Empty with empty reversed at front", Spandex.empty, Spandex.empty.patch(0, Spandex.empty.reverse))
+    assertEquals("Empty reversed with empty reversed at front", Spandex.empty, Spandex.empty.reverse.patch(0, Spandex.empty.reverse))
+    assertEquals("Empty with single at front", Spandex(1), Spandex.empty.patch(0, Spandex(1)))
+    assertEquals("Empty reversed with single at front", Spandex(1), Spandex.empty.reverse.patch(0, Spandex(1)))
+    assertEquals("Empty with single reversed at front", Spandex(1), Spandex.empty.patch(0, Spandex(1).reverse))
+    assertEquals("Empty reversed with single reversed at front", Spandex(1), Spandex.empty.reverse.patch(0, Spandex(1).reverse))
+    assertEquals("Single with empty at front replacing 0", Spandex(1), Spandex(1).patch(0, Spandex.empty, 0))
+    assertEquals("Single with empty at front replacing 0", Spandex(1), Spandex(1).patch(0, Spandex.empty, 0))
+    assertEquals("Single with empty at front replacing 1", Spandex.empty, Spandex(1).patch(0, Spandex.empty, 1))
+    assertEquals("Single with single at front replacing 0", Spandex(1, 2), Spandex(2).patch(0, Spandex(1), 0))
+    assertEquals("Single reversed with single at front replacing 0", Spandex(1, 2), Spandex(2).reverse.patch(0, Spandex(1)))
+    assertEquals("Single with single at front replacing 1", Spandex(1), Spandex(2).patch(0, Spandex(1), 1))
+    assertEquals("Single reversed with single at front replacing 1", Spandex(1), Spandex(2).reverse.patch(0, Spandex(1), 1))
+    assertEquals("Single with single at front replacing 2", Spandex(1), Spandex(2).patch(0, Spandex(1), 2))
+    assertEquals("Single with single at front replacing max", Spandex(1), Spandex(2).patch(0, Spandex(1), 245))
+    assertEquals("Single with multiple at front replacing 0", Spandex(1, 2, 3, 4), Spandex(4).patch(0, Spandex(1, 2, 3), 0))
+    assertEquals("Single with multiple at front replacing 1", Spandex(1, 2, 3), Spandex(4).patch(0, Spandex(1, 2, 3), 1))
+    assertEquals("Single with multiple at front replacing 2", Spandex(1, 2, 3), Spandex(4).patch(0, Spandex(1, 2, 3), 2))
+    assertEquals("Single with multiple at front replacing max", Spandex(1, 2, 3), Spandex(2).patch(0, Spandex(1, 2, 3), 245))
+    assertEquals("Multiple with empty at front replacing 0", Spandex(1, 2, 3), Spandex(1, 2, 3).patch(0, Spandex.empty, 0))
+    assertEquals("Multiple with empty at front replacing 1", Spandex(2, 3), Spandex(1, 2, 3).patch(0, Spandex.empty, 1))
+    assertEquals("Multiple with single at front replacing 0", Spandex(4, 1, 2, 3), Spandex(1, 2, 3).patch(0, Spandex(4), 0))
+    assertEquals("Multiple with single at front replacing 1", Spandex(4, 2, 3), Spandex(1, 2, 3).patch(0, Spandex(4), 1))
+    assertEquals("Multiple with single at front replacing 2", Spandex(4, 3), Spandex(1, 2, 3).patch(0, Spandex(4), 2))
+    assertEquals("Multiple with single at front replacing max", Spandex(4), Spandex(1, 2, 3).patch(0, Spandex(4), 245))
+  }
+  @Test
+  def testPatchToRear(): Unit = {
+    assertEquals("Empty with empty at rear", Spandex.empty, Spandex.empty.patch(0, Spandex.empty))
+    assertEquals("Empty with single at rear", Spandex(1), Spandex.empty.patch(0, Spandex(1)))
+    assertEquals("Single with empty at rear", Spandex(1), Spandex(1).patch(1, Spandex.empty))
+    assertEquals("Single with single at rear replacing 0", Spandex(2, 1), Spandex(2).patch(1, Spandex(1)))
+    assertEquals("Single with multiple at rear", Spandex(4, 1, 2, 3), Spandex(4).patch(1, Spandex(1, 2, 3)))
+    assertEquals("Multiple with empty at rear", Spandex(1, 2, 3), Spandex(1, 2, 3).patch(3, Spandex.empty))
+    assertEquals("Multiple with single at rear", Spandex(1, 2, 3, 4), Spandex(1, 2, 3).patch(3, Spandex(4)))
+  }
+  @Test
+  def testPatchInMiddle(): Unit = {
+    assertEquals("Multiple with empty in middle replacing 0", Spandex(1, 2, 3), Spandex(1, 2, 3).patch(1, Spandex.empty))
+    assertEquals("Multiple with empty in middle replacing 1", Spandex(1, 3), Spandex(1, 2, 3).patch(1, Spandex.empty, 1))
+    assertEquals("Multiple with empty in middle replacing max", Spandex(1), Spandex(1, 2, 3).patch(1, Spandex.empty, 245))
+    assertEquals("Multiple with single in middle replacing 0", Spandex(1, 4, 2, 3), Spandex(1, 2, 3).patch(1, Spandex(4)))
+    assertEquals("Multiple with single in middle replacing 1", Spandex(1, 4, 3), Spandex(1, 2, 3).patch(1, Spandex(4), 1))
+    assertEquals("Multiple with single in middle replacing max", Spandex(1, 4), Spandex(1, 2, 3).patch(1, Spandex(4), 245))
+    assertEquals("Multiple with multiple in middle replacing 0", Spandex(1, 4, 5, 6, 2, 3), Spandex(1, 2, 3).patch(1, Spandex(4, 5, 6)))
+    assertEquals("Multiple with multiple in middle replacing 1", Spandex(1, 4, 5, 6, 3), Spandex(1, 2, 3).patch(1, Spandex(4, 5, 6), 1))
+    assertEquals("Multiple with multiple in middle replacing max", Spandex(1, 4, 5, 6), Spandex(1, 2, 3).patch(1, Spandex(4, 5, 6), 245))
   }
 }

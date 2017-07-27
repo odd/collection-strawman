@@ -22,8 +22,8 @@ import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
   * <li>reasonable memory usage (approximately double that of an array with the same number of elements)
   * </ul>
   * <br/>
-  * Element can be added to both the front and the rear of the underlying array (via <code>prepend</code>/<code>prependAll</code>
-  * and <code>append</code>/<code>appendAll</code>/<code>concat</code> respectivly), but never more than once for any given array slot
+  * Elements can be added to both the front and the rear of the underlying array (via <code>prepend</code>/<code>prependAll</code>
+  * and <code>append</code>/<code>appendAll</code>/<code>concat</code> respectively), but never more than once for any given array slot
   * (any later modification attempts to an already modified slot results in a copy being made of the underlying array).
   * <br/>
   * <br/>
@@ -31,13 +31,13 @@ import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
   * assignments.
   * <br/>
   * <br/>
-  * The default array size is eight and when the underlying array is to small to fit a requested addition a new array twice as large is allocated.
+  * The smallest array size is eight and when the underlying array is too small to fit a requested addition a new array twice as large is allocated.
   * <br/>
   * <br/>
   * <b>Examples</b>
   * <br/>
   <pre><code>
-    EXPRESSION                                                  (array, start, stop)
+    // expression                                               (array, start, stop)
     Spandex()                                               ==> ([], 0, 0)
     Spandex() :+ a                                          ==> ([a, _, _, _, _, _, _, _], 0, 1)
     a +: Spandex()                                          ==> ([_, _, _, _, _, _, _, a], -1, 0)
@@ -73,6 +73,7 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
 
   //@`inline` // Causes problems with errors and eternal inlining when running test cases on Dotty
   private def isReversed: Boolean = start > stop
+  private def nonReversed: Boolean = start <= stop
 
   @`inline`
   private def frontIndexes = {
@@ -177,24 +178,21 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
 
   override final def prepend[B >: A](elem: B): Spandex[B] =
     if (isEmpty) Spandex(elem)
+    else if (nonReversed && primary.prependElement(elem, start))
+      new Spandex.Secondary[B](primary, start - 1, stop)
     else if (isReversed && primary.appendElement(elem, start))
       new Spandex.Secondary[B](primary, start + 1, stop)
-    else if (!isReversed && primary.prependElement(elem, start))
-      new Spandex.Secondary[B](primary, start - 1, stop)
     else elem +: resize(Spandex.capacitate((length - 1) * 2))
 
   override final def append[B >: A](elem: B): Spandex[B] =
     if (isEmpty) Spandex(elem)
+    else if (nonReversed && primary.appendElement(elem, stop))
+      new Spandex.Secondary[B](primary, start, stop + 1)
     else if (isReversed && primary.prependElement(elem, stop))
       new Spandex.Secondary[B](primary, start, stop - 1)
-    else if (!isReversed && primary.appendElement(elem, stop))
-      new Spandex.Secondary[B](primary, start, stop + 1)
     else resize(Spandex.capacitate((length - 1) * 2)) :+ elem
 
-  /** Alias for `prependAll` */
-  @`inline` final def ++:[B >: A](xs: IterableOnce[B]): Spandex[B] = prependAll(xs)
-
-  final def prependAll[B >: A](xs: IterableOnce[B]): Spandex[B] =
+  override final def prependAll[B >: A](xs: IterableOnce[B]): Spandex[B] =
     xs match {
       case _ if this.isEmpty => Spandex.fromIterable(xs)
       case that: Iterable[B] if that.knownSize == 0 || that.isEmpty => this
@@ -208,12 +206,6 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       case that: Spandex[B] => resize(Spandex.capacitate(this.size + that.size)).prependAll(that)
       case _ => Spandex.fromIterable(xs).concat(this)
     }
-
-  /** Alias for `appendAll` */
-  @`inline` final def :++[B >: A](xs: IterableOnce[B]): Spandex[B] = appendAll(xs)
-
-  /** Alias for `concat` */
-  @`inline` final def appendAll[B >: A](xs: IterableOnce[B]): Spandex[B] = concat(xs)
 
   override final def concat[B >: A](xs: IterableOnce[B]): Spandex[B] =
     xs match {
@@ -299,12 +291,21 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
 
   override final def updated[B >: A](i: Int, elem: B): Spandex[B] = {
     if (i < 0 || i >= length) throw new IndexOutOfBoundsException(i.toString)
+    else if (Spandex.isSame(elem, element(position(i)))) this
     else {
       val array = new Array[Any](capacity)
       java.lang.System.arraycopy(elements, 0, array, 0, capacity)
       array.update(position(i), elem)
       new Spandex.Primary[B](array, start, stop)
     }
+  }
+
+  override final def patch[B >: A](from: Int, xs: IterableOnce[B], replaced: Int = 0): Spandex[B] = {
+    if (from < 0 || from > length) throw new IndexOutOfBoundsException(from.toString)
+    else if (from == 0 && (replaced max 0) == 0) prependAll(xs)
+    else if (from == 0) coll.drop(replaced).prependAll(xs)
+    else if (from == length) coll.appendAll(xs)
+    else coll.take(from).appendAll(xs).appendAll(coll.slice(from + replaced, length))
   }
 
   override final def toArray[B >: A: ClassTag]: Array[B] =
@@ -357,9 +358,7 @@ object Spandex extends IterableFactory[Spandex] {
       val low = unpackLow(bnds)
       val high = unpackHigh(bnds)
       if (Spandex.distance(low, high) == capacity) false
-      else if (low < start
-        && ((elem.isInstanceOf[AnyRef] && elem.asInstanceOf[AnyRef].eq(element(index(start - 1)).asInstanceOf[AnyRef]))
-        || (!elem.isInstanceOf[AnyRef] && elem == element(index(start - 1))))) true
+      else if (low < start && isSame(elem, element(index(start - 1)))) true
       else if (low > -capacity && low == start && bounds.compareAndSet(bnds, pack(low - 1, high))) {
         elements(index(low - 1)) = elem
         true
@@ -386,9 +385,7 @@ object Spandex extends IterableFactory[Spandex] {
       val low = unpackLow(bnds)
       val high = unpackHigh(bnds)
       if (Spandex.distance(low, high) == capacity) false
-      else if (high > stop
-        && ((elem.isInstanceOf[AnyRef] && elem.asInstanceOf[AnyRef].eq(element(index(stop)).asInstanceOf[AnyRef]))
-        || (!elem.isInstanceOf[AnyRef] && elem == element(index(stop))))) true
+      else if (high > stop && isSame(elem, element(index(stop)))) true
       else if (high < capacity && high == stop && bounds.compareAndSet(bnds, pack(low, high + 1))) {
         elements(index(high)) = elem
         true
@@ -451,6 +448,10 @@ object Spandex extends IterableFactory[Spandex] {
     }
   }
   private[Spandex] def capacitate(n: Int): Int = (((n max 8) + 7) / 8) * 8
+
+  private[Spandex] def isSame(a: Any, b: Any) = (
+    (a.isInstanceOf[AnyRef] && a.asInstanceOf[AnyRef].eq(b.asInstanceOf[AnyRef]))
+    || (!a.isInstanceOf[AnyRef] && a == b))
 
   def tabulate[A](n: Int)(f: Int => A): Spandex[A] =
     if (n == 0) Spandex.Empty

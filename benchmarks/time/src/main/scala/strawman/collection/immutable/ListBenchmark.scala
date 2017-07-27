@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class ListBenchmark {
 
-  @Param(scala.Array("0"/*, "1", "2", "3", "4"*/, "7", "8"/*, "15", "16"*/, "17", "39", "282", "73121"/*, "7312102"*/))
+  @Param(scala.Array("0"/*, "1", "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "31980", "73121"/*, "150000"*/))
   var size: Int = _
 
   var xs: List[Long] = _
@@ -34,12 +34,11 @@ class ListBenchmark {
   }
 
   @Benchmark
-  //@OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
     var ys = List.empty[Long]
     var i = 0L
     while (i < size) {
-      ys = i :: ys // Note: In the case of TreeSet, always inserting elements that are already ordered creates a bias
+      ys = i :: ys
       i = i + 1
     }
     bh.consume(ys)
@@ -52,7 +51,7 @@ class ListBenchmark {
     var i = 0L
     while (i < size) {
       ys = ys ++ List(i) // Note: In the case of TreeSet, always inserting elements that are already ordered creates a bias
-      i = i + 1
+      i += 1
     }
     bh.consume(ys)
   }
@@ -67,10 +66,13 @@ class ListBenchmark {
   def concat(bh: Blackhole): Unit = bh.consume(xs ++ xs)
 
   @Benchmark
+  def prependAll(bh: Blackhole): Unit = bh.consume(xs.prependAll(xs))
+
+  @Benchmark
   def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
-//  @OperationsPerInvocation(size)
+  //@OperationsPerInvocation(size)
   def foreach_while(bh: Blackhole): Unit = {
     var ys = xs
     while (ys.nonEmpty) {
@@ -147,5 +149,27 @@ class ListBenchmark {
       i = i + 1
     }
     bh.consume(ys)
+  }
+
+  @Benchmark
+  @OperationsPerInvocation(1000)
+  def randomUpdate(bh: Blackhole): Unit = {
+    var i = 0
+    while (i < 1000) {
+      bh.consume(xs.updated(randomIndices(i), i))
+      i = i + 1
+    }
+  }
+
+  @Benchmark
+  @OperationsPerInvocation(1000)
+  def randomPatch(bh: Blackhole): Unit = {
+    var i = 0
+    while (i < 1000) {
+      val from = randomIndices(i)
+      val patch = scala.util.Random.nextInt(size)
+      bh.consume(xs.patch(from, xss(i).take(from), scala.util.Random.nextInt(xs.length)))
+      i = i + 1
+    }
   }
 }
