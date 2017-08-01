@@ -16,7 +16,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class VectorBenchmark {
 
-  @Param(scala.Array("0"/*, "1", "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "31980", "73121"/*, "150000"*/))
+  @Param(scala.Array("0"/*, "1", "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980", "73121", "120000"))
   var size: Int = _
 
   var xs: Vector[Long] = _

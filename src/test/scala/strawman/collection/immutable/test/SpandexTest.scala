@@ -7,7 +7,8 @@ import org.junit.Assert._
 import org.junit.Test
 
 import scala.{Any, Exception, Int, NoSuchElementException, Nothing, Unit}
-import scala.Predef.identity
+import scala.Predef.{identity, intWrapper}
+import scala.runtime.RichInt
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -704,5 +705,47 @@ class SpandexTest {
     assertEquals("Multiple with multiple in middle replacing 0", Spandex(1, 4, 5, 6, 2, 3), Spandex(1, 2, 3).patch(1, Spandex(4, 5, 6)))
     assertEquals("Multiple with multiple in middle replacing 1", Spandex(1, 4, 5, 6, 3), Spandex(1, 2, 3).patch(1, Spandex(4, 5, 6), 1))
     assertEquals("Multiple with multiple in middle replacing max", Spandex(1, 4, 5, 6), Spandex(1, 2, 3).patch(1, Spandex(4, 5, 6), 245))
+  }
+  @Test
+  def testShrink(): Unit = {
+    assertEquals("1 out of 8 is not shrunk", 8, Spandex(1, 2, 3, 4, 5, 6).slice(0, 1).primary.elements.length)
+    assertEquals("2 out of 8 is not shrunk", 8, Spandex(1, 2, 3, 4, 5, 6).slice(0, 2).primary.elements.length)
+    assertEquals("3 out of 8 is not shrunk", 8, Spandex(1, 2, 3, 4, 5, 6).slice(0, 3).primary.elements.length)
+    val s32 = Spandex.tabulate(32)(identity)
+    assertEquals("2 out of 32 is shrunk to 8", 8, s32.slice(0, 2).primary.elements.length)
+    assertEquals("8 out of 32 is shrunk to 8", 8, s32.slice(0, 8).primary.elements.length)
+    assertEquals("9 out of 32 is not shrunk", 32, s32.slice(0, 9).primary.elements.length)
+    var s = Spandex.empty[Int]
+    for (i <- 0 until 512) {
+      if (i % 2 == 0) s = s :+ i
+      else s = i +: s
+    }
+    assertEquals("512 is correct capacity", 512, s.primary.elements.length)
+    for (i <- 0 until 31) {
+      s = s.tail
+    }
+    assertEquals("after removing 31 out of 512 capacity is still 512", 512, s.primary.elements.length)
+    s = s.tail
+    assertEquals("after removing 32 out of 512 capacity is still 512", 512, s.primary.elements.length)
+    s = s.tail
+    assertEquals("after removing 33 out of 512 capacity is still 512", 512, s.primary.elements.length)
+    for (i <- 33 until 255) {
+      s = s.tail
+    }
+    assertEquals("after removing 255 out of 512 capacity is still 512", 512, s.primary.elements.length)
+    s = s.tail
+    assertEquals("after removing 256 out of 512 capacity is still 512", 512, s.primary.elements.length)
+    s = s.tail
+    assertEquals("after removing 257 out of 512 capacity is still 512", 512, s.primary.elements.length)
+    for (i <- 257 until 383) {
+      s = s.tail
+    }
+    assertEquals("after removing 383 out of 512 capacity is still 512", 512, s.primary.elements.length)
+    s = s.tail
+    assertEquals("after removing 384 out of 512 capacity is 128", 128, s.primary.elements.length)
+    s = s.tail
+    assertEquals("after removing 385 out of 512 capacity is 128", 128, s.primary.elements.length)
+    s = s.slice(0, 2)
+    assertEquals("after keeping 2 out of 128 capacity is 8", 8, s.primary.elements.length)
   }
 }
