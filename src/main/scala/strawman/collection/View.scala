@@ -184,37 +184,11 @@ object View extends IterableFactory[View] {
     override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize + 1 else -1
   }
 
-  /*
-  /** A view that appends the elements of another collection or iterator to its elements */
-  case class AppendAll[A](underlying: Iterable[A], other: IterableOnce[A]) extends View[A] {
-    def iterator() = underlying.iterator() ++ other
-    override def knownSize = other match {
-      case other: Iterable[_] if underlying.knownSize >= 0 && other.knownSize >= 0 =>
-        underlying.knownSize + other.knownSize
-      case _ =>
-        -1
-    }
-  }
-  */
-
   /** A view that prepends an element to its elements */
   case class Prepend[A](elem: A, underlying: Iterable[A]) extends View[A] {
     def iterator(): Iterator[A] = Concat(View.Single(elem), underlying).iterator()
     override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize + 1 else -1
   }
-
-  /*
-  /** A view that prepends the elements of another collection or iterator to its elements */
-  case class PrependAll[A](other: IterableOnce[A], underlying: Iterable[A]) extends View[A] {
-    def iterator() = other.iterator() ++ underlying.iterator()
-    override def knownSize = other match {
-      case other: Iterable[_] if underlying.knownSize >= 0 && other.knownSize >= 0 =>
-        underlying.knownSize + other.knownSize
-      case _ =>
-        -1
-    }
-  }
-  */
 
   case class Updated[A](underlying: Iterable[A], index: Int, elem: A) extends View[A] {
     def iterator(): Iterator[A] =
