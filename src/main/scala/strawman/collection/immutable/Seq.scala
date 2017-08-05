@@ -80,20 +80,20 @@ trait SeqOps[+A, +CC[_], +C] extends collection.SeqOps[A, CC, C] {
     */
   @`inline` final def :+ [B >: A](elem: B): CC[B] = append(elem)
 
-  def prependAll[B >: A](xs: IterableOnce[B]): CC[B] = fromIterable(View.PrependAll(xs, coll))
+  /*def prependAll[B >: A](xs: IterableOnce[B]): CC[B] = fromIterable(View.PrependAll(xs, coll))*/
 
   /** Alias for `prependAll`
     *
     * Note that :-ending operators are right associative (see example).
     * A mnemonic for `++:` vs. `:++` is: the COLon goes on the COLlection side.
     */
-  @`inline` final def ++:[B >: A](xs: IterableOnce[B]): CC[B] = prependAll(xs)
+  /*@`inline` final def ++:[B >: A](xs: IterableOnce[B]): CC[B] = prependAll(xs)*/
 
   /** Alias for `appendAll` */
-  @`inline` final def :++[B >: A](xs: IterableOnce[B]): CC[B] = appendAll(xs)
+  /*@`inline` final def :++[B >: A](xs: IterableOnce[B]): CC[B] = appendAll(xs)*/
 
   /** Alias for `concat` */
-  @`inline` def appendAll[B >: A](xs: IterableOnce[B]): CC[B] = concat(xs)
+  /*@`inline` def appendAll[B >: A](xs: IterableOnce[B]): CC[B] = concat(xs)*/
 
   /** A copy of this $coll with one single replaced element.
     *  @param  index  the position of the replacement
@@ -122,3 +122,13 @@ object IndexedSeq extends IterableFactory.Delegate[IndexedSeq](Vector)
 
 /** Base trait for immutable indexed Seq operations */
 trait IndexedSeqOps[+A, +CC[X] <: IndexedSeq[X], +C] extends SeqOps[A, CC, C] with collection.IndexedSeqOps[A, CC, C]
+
+/** Base trait for immutable linear sequences that have efficient `head` and `tail` */
+trait LinearSeq[+A]
+  extends Seq[A]
+    with collection.LinearSeq[A]
+    with LinearSeqOps[A, LinearSeq, LinearSeq[A]]
+
+trait LinearSeqOps[+A, +CC[X] <: LinearSeq[X], +C <: LinearSeq[A]]
+  extends SeqOps[A, CC, C]
+    with collection.LinearSeqOps[A, CC, C]

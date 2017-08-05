@@ -3,7 +3,7 @@ package collection.mutable
 
 import strawman.collection.{Iterator, MapFactory, StrictOptimizedIterableOps}
 
-import scala.{Boolean, Int, None, Option, SerialVersionUID, Serializable, Some, Unit}
+import scala.{Boolean, Int, None, NoSuchElementException, Option, SerialVersionUID, Serializable, Some, Unit, throws}
 import java.lang.String
 
 /** This class implements mutable maps using a hashtable.
@@ -24,7 +24,7 @@ import java.lang.String
 final class HashMap[K, V] private[collection] (contents: HashTable.Contents[K, DefaultEntry[K, V]])
   extends Map[K, V]
     with MapOps[K, V, HashMap, HashMap[K, V]]
-    with StrictOptimizedIterableOps[(K, V), HashMap[K, V]]
+    with StrictOptimizedIterableOps[(K, V), Iterable, HashMap[K, V]]
     with Serializable {
 
   def mapFactory = HashMap
@@ -68,6 +68,7 @@ final class HashMap[K, V] private[collection] (contents: HashTable.Contents[K, D
 
   override def contains(key: K): Boolean = table.findEntry(key) != null
 
+  @throws[NoSuchElementException]
   override def apply(key: K): V = {
     val e = table.findEntry(key)
     if (e eq null) default(key)
@@ -88,12 +89,14 @@ final class HashMap[K, V] private[collection] (contents: HashTable.Contents[K, D
     val entry = table.findEntry0(key, i)
     if (entry != null) entry.value
     else {
-      val table0 = table
+      val table0 = table.table
       val default = defaultValue
       // Avoid recomputing index if the `defaultValue()` hasn't triggered
       // a table resize.
-      val newEntryIndex = if (table0 eq table) i else table.index(hash)
-      table.addEntry0(table.createNewEntry(key, default), newEntryIndex)
+      val newEntryIndex = if (table0 eq table.table) i else table.index(hash)
+      val e = table.createNewEntry(key, default)
+      if (table.tableSize >= table.threshold) table.addEntry(e)
+      else table.addEntry2(e, newEntryIndex)
       default
     }
   }

@@ -3,7 +3,7 @@ package collection
 
 import collection.mutable.Builder
 
-import scala.{Any, Boolean, ClassCastException, Equals, Int, NoSuchElementException, None, Nothing, Option, Ordering, PartialFunction, Some, `inline`}
+import scala.{Any, Boolean, ClassCastException, Equals, Int, NoSuchElementException, None, Nothing, Option, Ordering, PartialFunction, Some, `inline`, throws}
 import scala.annotation.unchecked.uncheckedVariance
 import scala.util.hashing.MurmurHash3
 
@@ -56,6 +56,7 @@ trait MapOps[K, +V, +CC[X, Y] <: Map[X, Y], +C <: Map[K, V]]
     *  @return     the value associated with the given key, or the result of the
     *              map's `default` method, if none exists.
     */
+  @throws[NoSuchElementException]
   def apply(key: K): V = get(key) match {
     case None => default(key)
     case Some(value) => value
@@ -69,6 +70,7 @@ trait MapOps[K, +V, +CC[X, Y] <: Map[X, Y], +C <: Map[K, V]]
     *  @param key the given key value for which a binding is missing.
     *  @throws NoSuchElementException
     */
+  @throws[NoSuchElementException]
   def default(key: K): V =
     throw new NoSuchElementException("key not found: " + key)
 
@@ -94,14 +96,27 @@ trait MapOps[K, +V, +CC[X, Y] <: Map[X, Y], +C <: Map[K, V]]
     */
   def empty: C
 
+  override def withFilter(p: ((K, V)) => Boolean): MapWithFilter = new MapWithFilter(p)
+
+  /** Specializes `WithFilter` for Map collection types */
+  class MapWithFilter(p: ((K, V)) => Boolean) extends WithFilter(p) {
+
+    def map[K2, V2](f: ((K, V)) => (K2, V2)): CC[K2, V2] = mapFactory.fromIterable(View.Map(filtered, f))
+
+    def flatMap[K2, V2](f: ((K, V)) => IterableOnce[(K2, V2)]): CC[K2, V2] = mapFactory.fromIterable(View.FlatMap(filtered, f))
+
+    override def withFilter(q: ((K, V)) => Boolean): MapWithFilter = new MapWithFilter(kv => p(kv) && q(kv))
+
+  }
+
   def map[K2, V2](f: ((K, V)) => (K2, V2)): CC[K2, V2] = mapFromIterable(View.Map(coll, f))
 
   def flatMap[K2, V2](f: ((K, V)) => IterableOnce[(K2, V2)]): CC[K2, V2] = mapFromIterable(View.FlatMap(coll, f))
 
-  def concat [V2 >: V](xs: collection.Iterable[(K, V2)]): CC[K, V2] = mapFromIterable(View.Concat(coll, xs))
+  def concat[V2 >: V](xs: collection.IterableOnce[(K, V2)]): CC[K, V2] = mapFromIterable(View.Concat(coll, xs))
 
   /** Alias for `concat` */
-  /*@`inline` final*/ def ++ [V2 >: V](xs: collection.Iterable[(K, V2)]): CC[K, V2] = concat(xs)
+  /*@`inline` final*/ def ++ [V2 >: V](xs: collection.IterableOnce[(K, V2)]): CC[K, V2] = concat(xs)
 
   def canEqual(that: Any): Boolean = true
 

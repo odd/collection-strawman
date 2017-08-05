@@ -21,6 +21,7 @@ class ListBenchmark {
 
   var xs: List[Long] = _
   var xss: scala.Array[List[Long]] = _
+  var zipped: List[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
 
   @Setup(Level.Trial)
@@ -28,12 +29,14 @@ class ListBenchmark {
     def freshCollection() = List((1 to size).map(_.toLong): _*)
     xs = freshCollection()
     xss = scala.Array.fill(1000)(freshCollection())
+    zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
     }
   }
 
   @Benchmark
+//  @OperationsPerInvocation(size)
   def cons(bh: Blackhole): Unit = {
     var ys = List.empty[Long]
     var i = 0L
@@ -72,7 +75,7 @@ class ListBenchmark {
   def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
-  //@OperationsPerInvocation(size)
+//  @OperationsPerInvocation(size)
   def foreach_while(bh: Blackhole): Unit = {
     var ys = xs
     while (ys.nonEmpty) {
@@ -137,6 +140,27 @@ class ListBenchmark {
     val result = xs.groupBy(_ % 5)
     bh.consume(result)
   }
+
+  @Benchmark
+  @OperationsPerInvocation(100)
+  def span(bh: Blackhole): Unit = {
+    var i = 0
+    while (i < 100) {
+      val (xs1, xs2) = xs.span(x => x < randomIndices(i))
+      bh.consume(xs1)
+      bh.consume(xs2)
+      i += 1
+    }
+  }
+
+  @Benchmark
+  def unzip(bh: Blackhole): Unit = bh.consume(zipped.unzip)
+
+  @Benchmark
+  def padTo(bh: Blackhole): Unit = bh.consume(xs.padTo(size * 2, 42))
+
+  @Benchmark
+  def append(bh: Blackhole): Unit = bh.consume(xs.append(42))
 
   @Benchmark
   //@OperationsPerInvocation(size)

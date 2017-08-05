@@ -18,33 +18,33 @@ class TraverseTest {
     xs.foldLeft[Option[Builder[A, CC[A]]]](Some(xs.iterableFactory.newBuilder[A]())) {
       case (Some(builder), Some(a)) => Some(builder += a)
       case _ => None
-    }.map(_.result)
-  def optionSequence1[CC[X] <: Iterable[X] with SortedOps[X, CC, CC[X]], A : Ordering](xs: CC[Option[A]]): Option[CC[A]] =
+    }.map(_.result())
+  def optionSequence1[CC[X] <: SortedSet[X] with SortedSetOps[X, CC, CC[X]], A : Ordering](xs: CC[Option[A]]): Option[CC[A]] =
     xs.foldLeft[Option[Builder[A, CC[A]]]](Some(xs.sortedIterableFactory.newBuilder[A]())) {
       case (Some(builder), Some(a)) => Some(builder += a)
       case _ => None
-    }.map(_.result)
+    }.map(_.result())
 
   // ...or use BuildFrom to abstract over both and also allow building arbitrary collection types
   def optionSequence2[CC[X] <: Iterable[X], A, To](xs: CC[Option[A]])(implicit bf: BuildFrom[CC[Option[A]], A, To]): Option[To] =
     xs.foldLeft[Option[Builder[A, To]]](Some(bf.newBuilder(xs))) {
       case (Some(builder), Some(a)) => Some(builder += a)
       case _ => None
-    }.map(_.result)
+    }.map(_.result())
 
   // Using dependent types:
   def optionSequence3[A, To](xs: Iterable[Option[A]])(implicit bf: BuildFrom[xs.type, A, To]): Option[To] =
     xs.foldLeft[Option[Builder[A, To]]](Some(bf.newBuilder(xs))) {
       case (Some(builder), Some(a)) => Some(builder += a)
       case _ => None
-    }.map(_.result)
+    }.map(_.result())
 
   def eitherSequence[A, B, To](xs: Iterable[Either[A, B]])(implicit bf: BuildFrom[xs.type, B, To]): Either[A, To] =
     xs.foldLeft[Either[A, Builder[B, To]]](Right(bf.newBuilder(xs))) {
       case (Right(builder), Right(b)) => Right(builder += b)
       case (Left(a)       ,        _) => Left(a)
       case (_             ,  Left(a)) => Left(a)
-    }.right.map(_.result)
+    }.right.map(_.result())
 
   @Test
   def optionSequence1Test: Unit = {
@@ -108,7 +108,7 @@ class TraverseTest {
     for (a <- coll) {
       if (f.isDefinedAt(a)) builder ++= f(a)
     }
-    builder.result
+    builder.result()
   }
 
   def mapSplit[A, B, C, ToL, ToR](coll: Iterable[A])(f: A => Either[B, C])
@@ -117,7 +117,7 @@ class TraverseTest {
     val right = bfRight.newBuilder(coll)
     for (a <- coll)
       f(a).fold(left.add, right.add)
-    (left.result, right.result)
+    (left.result(), right.result())
   }
 
 
@@ -134,6 +134,10 @@ class TraverseTest {
     val xs7 = immutable.HashMap((1, "1"), (2, "2"))
     val xs8 = flatCollect(xs7) { case (2, v) => immutable.List((v, v)) }
     val xs9: immutable.HashMap[String, String] = xs8
+
+    val xs10 = immutable.TreeSet(1, 2, 3)
+    val xs11 = flatCollect(xs10) { case 2 => immutable.List("foo", "bar") }
+    val xs12: immutable.TreeSet[String] = xs11
   }
 
   @Test

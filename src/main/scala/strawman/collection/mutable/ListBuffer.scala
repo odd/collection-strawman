@@ -2,7 +2,7 @@ package strawman.collection
 package mutable
 
 import scala.annotation.unchecked.uncheckedVariance
-import scala.{Any, Int, Unit, Boolean}
+import scala.{Any, Boolean, Int, Unit, throws}
 import scala.Int._
 import strawman.collection
 import strawman.collection.immutable.{List, Nil, ::}
@@ -14,7 +14,7 @@ import scala.Predef.{assert, intWrapper}
 class ListBuffer[A]
   extends GrowableSeq[A]
      with SeqOps[A, ListBuffer, ListBuffer[A]]
-     with StrictOptimizedIterableOps[A, ListBuffer[A]] {
+     with StrictOptimizedIterableOps[A, ListBuffer, ListBuffer[A]] {
 
   private var first: List[A] = Nil
   private var last0: ::[A] = null
@@ -29,6 +29,7 @@ class ListBuffer[A]
 
   protected[this] def fromSpecificIterable(coll: collection.Iterable[A]): ListBuffer[A] = fromIterable(coll)
 
+  @throws[IndexOutOfBoundsException]
   def apply(i: Int) = first.apply(i)
 
   def length = len
@@ -49,6 +50,19 @@ class ListBuffer[A]
   def toList = {
     aliased = true
     first
+  }
+
+  /** Prepends the elements of this buffer to a given list
+    *
+    *  @param xs   the list to which elements are prepended
+    */
+  def prependToList(xs: List[A]): List[A] = {
+    if (isEmpty) xs
+    else {
+      ensureUnaliased()
+      last0.next = xs
+      toList
+    }
   }
 
   def clear(): Unit = {

@@ -2,7 +2,7 @@ package strawman.collection
 
 import strawman.collection.mutable.{ArrayBuffer, Builder}
 
-import scala.{Any, Boolean, Equals, Int, NoSuchElementException, Nothing, annotation, IndexOutOfBoundsException}
+import scala.{Any, Boolean, Equals, Int, NoSuchElementException, Nothing, annotation, IndexOutOfBoundsException, throws}
 import scala.Predef.{<:<, intWrapper}
 
 /** Concrete collection type: View */
@@ -82,8 +82,16 @@ object View extends IterableFactory[View] {
   }
 
   /** A view that filters an underlying collection. */
-  case class Filter[A](underlying: Iterable[A], p: A => Boolean) extends View[A] {
+  class Filter[A](val underlying: Iterable[A], val p: A => Boolean) extends View[A] {
     def iterator() = underlying.iterator().filter(p)
+  }
+
+  object Filter {
+    def apply[A](underlying: Iterable[A], p: A => Boolean): Filter[A] =
+      underlying match {
+        case filter: Filter[A] => new Filter(filter.underlying, a => filter.p(a) && p(a))
+        case _                 => new Filter(underlying, p)
+      }
   }
 
   /** A view that partitions an underlying collection into two views */
@@ -113,14 +121,6 @@ object View extends IterableFactory[View] {
       if (underlying.knownSize >= 0) (underlying.knownSize - normN) max 0 else -1
   }
 
-  /** A view that drops trailing elements of the underlying collection. */
-  case class DropRight[A](underlying: Iterable[A], n: Int) extends View[A] {
-    def iterator() = underlying.iterator().dropRight(n)
-    protected val normN = n max 0
-    override def knownSize =
-      if (underlying.knownSize >= 0) (underlying.knownSize - normN) max 0 else -1
-  }
-
   case class DropWhile[A](underlying: Iterable[A], p: A => Boolean) extends View[A] {
     def iterator() = underlying.iterator().dropWhile(p)
   }
@@ -128,14 +128,6 @@ object View extends IterableFactory[View] {
   /** A view that takes leading elements of the underlying collection. */
   case class Take[A](underlying: Iterable[A], n: Int) extends View[A] {
     def iterator() = underlying.iterator().take(n)
-    protected val normN = n max 0
-    override def knownSize =
-      if (underlying.knownSize >= 0) underlying.knownSize min normN else -1
-  }
-
-  /** A view that takes trailing elements of the underlying collection. */
-  case class TakeRight[A](underlying: Iterable[A], n: Int) extends View[A] {
-    def iterator() = underlying.iterator().takeRight(n)
     protected val normN = n max 0
     override def knownSize =
       if (underlying.knownSize >= 0) underlying.knownSize min normN else -1
@@ -162,14 +154,14 @@ object View extends IterableFactory[View] {
     def iterator() = underlying.iterator().flatMap(f)
   }
 
-  /** A view that concatenates elements of the underlying collection with the elements
-   *  of another collection or iterator.
+  /** A view that concatenates elements of the prefix collection or iterator with the elements
+   *  of the suffix collection or iterator.
    */
-  case class Concat[A](underlying: Iterable[A], other: IterableOnce[A]) extends View[A] {
-    def iterator() = underlying.iterator() ++ other
-    override def knownSize = other match {
-      case other: Iterable[_] if underlying.knownSize >= 0 && other.knownSize >= 0 =>
-        underlying.knownSize + other.knownSize
+  case class Concat[A](prefix: IterableOnce[A], suffix: IterableOnce[A]) extends View[A] {
+    def iterator() = prefix.iterator() ++ suffix.iterator()
+    override def knownSize = (prefix, suffix) match {
+      case (px: Iterable[_], sx: Iterable[_]) if px.knownSize >= 0 && sx.knownSize >= 0 =>
+        px.knownSize + sx.knownSize
       case _ =>
         -1
     }
@@ -192,6 +184,7 @@ object View extends IterableFactory[View] {
     override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize + 1 else -1
   }
 
+  /*
   /** A view that appends the elements of another collection or iterator to its elements */
   case class AppendAll[A](underlying: Iterable[A], other: IterableOnce[A]) extends View[A] {
     def iterator() = underlying.iterator() ++ other
@@ -202,6 +195,7 @@ object View extends IterableFactory[View] {
         -1
     }
   }
+  */
 
   /** A view that prepends an element to its elements */
   case class Prepend[A](elem: A, underlying: Iterable[A]) extends View[A] {
@@ -209,6 +203,7 @@ object View extends IterableFactory[View] {
     override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize + 1 else -1
   }
 
+  /*
   /** A view that prepends the elements of another collection or iterator to its elements */
   case class PrependAll[A](other: IterableOnce[A], underlying: Iterable[A]) extends View[A] {
     def iterator() = other.iterator() ++ underlying.iterator()
@@ -219,6 +214,7 @@ object View extends IterableFactory[View] {
         -1
     }
   }
+  */
 
   case class Updated[A](underlying: Iterable[A], index: Int, elem: A) extends View[A] {
     def iterator(): Iterator[A] =
@@ -315,7 +311,7 @@ object View extends IterableFactory[View] {
   case class PadTo[A](underlying: Iterable[A], len: Int, elem: A) extends View[A] {
     def iterator(): Iterator[A] = new Iterator[A] {
       private var i = 0
-      private var it = underlying.iterator()
+      private val it = underlying.iterator()
       def next(): A = {
         val a =
           if (it.hasNext) it.next()
@@ -324,7 +320,7 @@ object View extends IterableFactory[View] {
         i += 1
         a
       }
-      def hasNext: Boolean = i < len
+      def hasNext: Boolean = it.hasNext || i < len
     }
     override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize max len else -1
   }
@@ -334,6 +330,7 @@ object View extends IterableFactory[View] {
 /** A trait representing indexable collections with finite length */
 trait ArrayLike[+A] extends Any {
   def length: Int
+  @throws[IndexOutOfBoundsException]
   def apply(i: Int): A
 }
 
@@ -350,6 +347,8 @@ trait IndexedView[+A] extends View[A] with ArrayLike[A] { self =>
     }
   }
 
+  override def knownSize: Int = length
+
   override def take(n: Int): IndexedView[A] = new IndexedView.Take(this, n)
   override def takeRight(n: Int): IndexedView[A] = new IndexedView.TakeRight(this, n)
   override def drop(n: Int): IndexedView[A] = new IndexedView.Drop(this, n)
@@ -364,39 +363,41 @@ object IndexedView {
   extends View.Take(underlying, n) with IndexedView[A] {
     override def iterator() = super.iterator() // needed to avoid "conflicting overrides" error
     def length = underlying.length min normN
+    @throws[IndexOutOfBoundsException]
     def apply(i: Int) = underlying.apply(i)
   }
 
-  class TakeRight[A](underlying: IndexedView[A], n: Int)
-  extends View.TakeRight(underlying, n) with IndexedView[A] {
-    override def iterator() = super.iterator() // needed to avoid "conflicting overrides" error
-    def length = underlying.length min normN
-    def apply(i: Int) = underlying.apply(i)
+  class TakeRight[A](underlying: IndexedView[A], n: Int) extends IndexedView[A] {
+    private[this] val delta = (underlying.length - (n max 0)) max 0
+    def length = underlying.length - delta
+    @throws[IndexOutOfBoundsException]
+    def apply(i: Int) = underlying.apply(i + delta)
   }
 
   class Drop[A](underlying: IndexedView[A], n: Int)
   extends View.Drop(underlying, n) with IndexedView[A] {
     override def iterator() = super.iterator()
     def length = (underlying.length - normN) max 0
+    @throws[IndexOutOfBoundsException]
     def apply(i: Int) = underlying.apply(i + normN)
   }
 
-  class DropRight[A](underlying: IndexedView[A], n: Int)
-  extends View.DropRight(underlying, n) with IndexedView[A] {
-    override def iterator() = super.iterator()
-    def length = (underlying.length - normN) max 0
-    def apply(i: Int) = underlying.apply(i + normN)
+  class DropRight[A](underlying: IndexedView[A], n: Int) extends IndexedView[A] {
+    private[this] val len = (underlying.length - (n max 0)) max 0
+    def length = len
+    @throws[IndexOutOfBoundsException]
+    def apply(i: Int) = underlying.apply(i)
   }
 
-  class Map[A, B](underlying: IndexedView[A], f: A => B)
-  extends View.Map(underlying, f) with IndexedView[B] {
-    override def iterator() = super.iterator()
+  class Map[A, B](underlying: IndexedView[A], f: A => B) extends IndexedView[B] {
     def length = underlying.length
+    @throws[IndexOutOfBoundsException]
     def apply(n: Int) = f(underlying.apply(n))
   }
 
   case class Reverse[A](underlying: IndexedView[A]) extends IndexedView[A] {
     def length = underlying.length
+    @throws[IndexOutOfBoundsException]
     def apply(i: Int) = underlying.apply(length - 1 - i)
   }
 }

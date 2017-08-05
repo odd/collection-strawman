@@ -251,7 +251,7 @@ trait IterableOps[+A, +CC[X], +C] extends Any {
     *      xs.to(ArrayBuffer)
     *      xs.to(BitSet) // for xs: Iterable[Int]
     */
-  def to[C1](f: FromSpecificIterable[A, C1]): C1 = f.fromSpecificIterable(coll)
+  def to[C1](f: CanBuild[A, C1]): C1 = f.fromSpecificIterable(coll)
 
   /** Convert collection to array. */
   def toArray[B >: A: ClassTag]: Array[B] =
@@ -448,6 +448,75 @@ trait IterableOps[+A, +CC[X], +C] extends Any {
     */
   def filterNot(pred: A => Boolean): C = fromSpecificIterable(View.Filter(coll, (a: A) => !pred(a)))
 
+  /** Creates a non-strict filter of this $coll.
+    *
+    *  Note: the difference between `c filter p` and `c withFilter p` is that
+    *        the former creates a new collection, whereas the latter only
+    *        restricts the domain of subsequent `map`, `flatMap`, `foreach`,
+    *        and `withFilter` operations.
+    *  $orderDependent
+    *
+    *  @param p   the predicate used to test elements.
+    *  @return    an object of class `WithFilter`, which supports
+    *             `map`, `flatMap`, `foreach`, and `withFilter` operations.
+    *             All these operations apply to those elements of this $coll
+    *             which satisfy the predicate `p`.
+    */
+  def withFilter(p: A => Boolean): WithFilter = new WithFilter(p)
+
+  /** A template trait that contains just the `map`, `flatMap`, `foreach` and `withFilter` methods
+    *  of trait `Iterable`.
+    */
+  class WithFilter(p: A => Boolean) {
+
+    protected[this] def filtered = View.Filter(coll, p)
+
+    /** Builds a new collection by applying a function to all elements of the
+      * `filtered` outer $coll.
+      *
+      *  @param f      the function to apply to each element.
+      *  @tparam B     the element type of the returned collection.
+      *  @return       a new $coll resulting from applying
+      *                the given function `f` to each element of the filtered outer $coll
+      *                and collecting the results.
+      */
+    def map[B](f: A => B): CC[B] = iterableFactory.fromIterable(View.Map(filtered, f))
+
+    /** Builds a new collection by applying a function to all elements of the
+      * `filtered` outer $coll containing this `WithFilter` instance that satisfy
+      *
+      *  @param f      the function to apply to each element.
+      *  @tparam B     the element type of the returned collection.
+      *  @return       a new $coll resulting from applying
+      *                the given collection-valued function `f` to each element
+      *                of the filtered outer $coll and
+      *                concatenating the results.
+      */
+    def flatMap[B](f: A => IterableOnce[B]): CC[B] = iterableFactory.fromIterable(View.FlatMap(filtered, f))
+
+    /** Applies a function `f` to all elements of the `filtered` outer $coll.
+      *
+      *  @param  f   the function that is applied for its side-effect to every element.
+      *              The result of function `f` is discarded.
+      *
+      *  @tparam  U  the type parameter describing the result of function `f`.
+      *              This result will always be ignored. Typically `U` is `Unit`,
+      *              but this is not necessary.
+      */
+    def foreach[U](f: A => U): Unit = filtered.foreach(f)
+
+    /** Further refines the filter for this `filtered` $coll.
+      *
+      *  @param q   the predicate used to test elements.
+      *  @return    an object of class `WithFilter`, which supports
+      *             `map`, `flatMap`, `foreach`, and `withFilter` operations.
+      *             All these operations apply to those elements of this $coll which
+      *             also satisfy both `p` and `q` predicates.
+      */
+    def withFilter(q: A => Boolean): WithFilter = new WithFilter(a => p(a) && q(a))
+
+  }
+
   /** A pair of, first, all elements that satisfy prediacte `p` and, second,
     *  all elements that do not. Interesting because it splits a collection in two.
     *
@@ -475,7 +544,18 @@ trait IterableOps[+A, +CC[X], +C] extends Any {
   def take(n: Int): C = fromSpecificIterable(View.Take(coll, n))
 
   /** A collection containing the last `n` elements of this collection. */
-  def takeRight(n: Int): C = fromSpecificIterable(View.TakeRight(coll, n))
+  def takeRight(n: Int): C = {
+    val b = newSpecificBuilder()
+    b.sizeHintBounded(n, coll)
+    val lead = coll.iterator() drop n
+    val it = coll.iterator()
+    while (lead.hasNext) {
+      lead.next()
+      it.next()
+    }
+    while (it.hasNext) b += it.next()
+    b.result()
+  }
 
   /** Takes longest prefix of elements that satisfy a predicate.
     *  $orderDependent
@@ -506,7 +586,17 @@ trait IterableOps[+A, +CC[X], +C] extends Any {
   /** The rest of the collection without its `n` last elements. For
     *  linear, immutable collections this should avoid making a copy.
     */
-  def dropRight(n: Int): C = fromSpecificIterable(View.DropRight(coll, n))
+  def dropRight(n: Int): C = {
+    val b = newSpecificBuilder()
+    if (n >= 0) b.sizeHint(coll, delta = -n)
+    val lead = coll.iterator() drop n
+    val it = coll.iterator()
+    while (lead.hasNext) {
+      b += it.next()
+      lead.next()
+    }
+    b.result()
+  }
 
   /** Skips longest sequence of elements of this iterator which satisfy given
     *  predicate `p`, and returns an iterator of the remaining elements.
@@ -680,19 +770,60 @@ trait IterableOps[+A, +CC[X], +C] extends Any {
       else View.Empty
     }
 
+  /** Alias for `prependAll` */
+  def concat[B >: A](suffix: IterableOnce[B]): CC[B] = appendAll(suffix)
+
+  /** Alias for `concat` */
+  @`inline` final def ++ [B >: A](suffix: IterableOnce[B]): CC[B] = concat(suffix)
+
   /** Returns a new $coll containing the elements from the left hand operand followed by the elements from the
     *  right hand operand. The element type of the $coll is the most specific superclass encompassing
     *  the element types of the two operands.
     *
-    *  @param xs   the traversable to append.
-    *  @tparam B   the element type of the returned collection.
-    *  @return     a new collection of type `CC[B]` which contains all elements
-    *              of this $coll followed by all elements of `xs`.
+    *  @param suffix the traversable to append.
+    *  @tparam B     the element type of the returned collection.
+    *  @return       a new collection of type `CC[B]` which contains all elements
+    *                of this $coll followed by all elements of `suffix`.
     */
-  def concat[B >: A](xs: IterableOnce[B]): CC[B] = fromIterable(View.Concat(coll, xs))
+  def appendAll[B >: A](suffix: IterableOnce[B]): CC[B] = fromIterable(View.Concat(coll, suffix))
 
-  /** Alias for `concat` */
-  @`inline` final def ++ [B >: A](xs: IterableOnce[B]): CC[B] = concat(xs)
+  /** Alias for `appendAll` */
+  @`inline` final def :++ [B >: A](suffix: IterableOnce[B]): CC[B] = appendAll(suffix)
+
+  /** As with `++`, returns a new collection containing the elements from the left operand followed by the
+    *  elements from the right operand.
+    *
+    *  It differs from `++` in that the right operand determines the type of
+    *  the resulting collection rather than the left one.
+    *  Mnemonic: the COLon is on the side of the new COLlection type.
+    *
+    *  @param prefix   the traversable to prepend.
+    *  @tparam B     the element type of the returned collection.
+    *  @return       a new collection which contains all elements
+    *                of `prefix` followed by all the elements of this $coll.
+    *
+    *  @usecase def prependAll[B](that: TraversableOnce[B]): $Coll[B]
+    *    @inheritdoc
+    *
+    *    Example:
+    *    {{{
+    *      scala> val x = List(1)
+    *      x: List[Int] = List(1)
+    *
+    *      scala> val y = Vector(2)
+    *      y: scala.collection.immutable.Vector[Int] = Vector(2)
+    *
+    *      scala> val z = x ++: y
+    *      z: scala.collection.immutable.Vector[Int] = Vector(1, 2)
+    *    }}}
+    *
+    *    @return       a new $coll which contains all elements of `prefix` followed
+    *                  by all the elements of this $coll.
+    */
+  def prependAll[B >: A](prefix: IterableOnce[B]): CC[B] = fromIterable(View.Concat(prefix, coll))
+
+  /** Alias for `prependAll` */
+  @`inline` final def ++: [B >: A](prefix: IterableOnce[B]): CC[B] = prependAll(prefix)
 
   /** Returns a $coll formed from this $coll and another iterable collection
     *  by combining corresponding elements in pairs.

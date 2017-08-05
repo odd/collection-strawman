@@ -1,9 +1,10 @@
 package strawman
 package collection
 
-import scala.{Any, Array, Boolean, Equals, `inline`, Int}
+import scala.{Any, Array, Boolean, Equals, Int, NoSuchElementException, `inline`, throws}
 import scala.Predef.intWrapper
 import scala.util.hashing.MurmurHash3
+import java.lang.String
 
 /** Base trait for set collections.
   */
@@ -25,7 +26,7 @@ trait SetOps[A, +CC[X], +C <: Set[A]]
     *  @param elem the element to test for membership.
     *  @return  `true` if `elem` is contained in this set, `false` otherwise.
     */
-  @`inline` final def apply(elem: A): Boolean = this.contains(elem)
+  /*@`inline`*/ final def apply(elem: A): Boolean = this.contains(elem)
 
   /** Tests whether this set is a subset of another set.
     *
@@ -81,6 +82,7 @@ trait SetOps[A, +CC[X], +C <: Set[A]]
     idxs(len) = elms.size
 
     def hasNext = _hasNext
+    @throws[NoSuchElementException]
     def next(): C = {
       if (!hasNext) Iterator.empty.next()
 
@@ -115,6 +117,8 @@ trait SetOps[A, +CC[X], +C <: Set[A]]
     }
 
   override def hashCode(): Int = Set.setHash(coll)
+
+  override def toString(): String = super[IterableOps].toString() // Because `Function1` overrides `toString` too
 
   /** Computes the intersection between this set and another set.
     *
