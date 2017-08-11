@@ -2,7 +2,7 @@ package strawman.collection
 
 import strawman.collection.mutable.{ArrayBuffer, Builder}
 
-import scala.{Any, Boolean, Equals, Int, NoSuchElementException, Nothing, annotation, IndexOutOfBoundsException, throws}
+import scala.{Any, Boolean, Equals, NoSuchElementException, IndexOutOfBoundsException, Int, Nothing, annotation, throws}
 import scala.Predef.{<:<, intWrapper}
 
 /** Concrete collection type: View */
@@ -94,6 +94,14 @@ object View extends IterableFactory[View] {
       }
   }
 
+  case class FilterKeys[K, V](underlying: Iterable[(K, V)], p: K => Boolean) extends View[(K, V)] {
+    def iterator(): Iterator[(K, V)] = underlying.iterator().filter(kv => p(kv._1))
+  }
+
+  /** A view that removes the duplicated elements **/
+  class Distinct[A](val underlying: Iterable[A]) extends View[A] {
+    def iterator(): Iterator[A] = underlying.iterator().distinct
+  }
   /** A view that partitions an underlying collection into two views */
   case class Partition[A](underlying: Iterable[A], p: A => Boolean) {
 
@@ -147,6 +155,11 @@ object View extends IterableFactory[View] {
   case class Map[A, B](underlying: Iterable[A], f: A => B) extends View[B] {
     def iterator() = underlying.iterator().map(f)
     override def knownSize = underlying.knownSize
+  }
+
+  case class MapValues[K, V, W](underlying: Iterable[(K, V)], f: V => W) extends View[(K, W)] {
+    def iterator(): Iterator[(K, W)] = underlying.iterator().map(kv => (kv._1, f(kv._2)))
+    override def knownSize: Int = underlying.knownSize
   }
 
   /** A view that flatmaps elements of the underlying collection. */
@@ -205,63 +218,9 @@ object View extends IterableFactory[View] {
       }
   }
 
-  /*
-    // Implementated as bellow in scala.collection.SeqLike
-    def patch[B >: A, That](from: Int, patch: GenSeq[B], replaced: Int)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
-      val b = bf(repr)
-      var i = 0
-      val it = this.iterator
-      while (i < from && it.hasNext) {
-        b += it.next()
-        i += 1
-      }
-      b ++= patch.seq
-      i = replaced
-      while (i > 0 && it.hasNext) {
-        it.next()
-        i -= 1
-      }
-      while (it.hasNext) b += it.next()
-      b.result()
-    }
-   */
-
-  case class Patched[A](underlying: Iterable[A], from: Int, other: IterableOnce[A], replaced: Int) extends View[A] {
+  private[collection] class Patched[A](underlying: Iterable[A], from: Int, other: IterableOnce[A], replaced: Int) extends View[A] {
     if (from < 0 || from > size) throw new IndexOutOfBoundsException(from.toString)
-    def iterator(): Iterator[A] =
-      new Iterator[A] {
-        private[this] var uit = underlying.iterator()
-        private[this] var oit = other.iterator()
-        private[this] var i = 0
-        private[this] var isCurrent = false
-        private[this] var current: A = _
-        def hasNext: Boolean = isCurrent || {
-          if (i < from && uit.hasNext) {
-            i += 1
-            current = uit.next()
-            isCurrent = true
-            true
-          } else {
-            if (i == from) uit.drop(replaced)
-            i += 1
-            if (oit.hasNext) {
-              current = oit.next()
-              isCurrent = true
-              true
-            } else if (uit.hasNext) {
-              current = uit.next()
-              isCurrent = true
-              true
-            } else false
-          }
-        }
-        def next(): A = {
-          if (hasNext) {
-            isCurrent = false
-            current
-          } else throw new NoSuchElementException
-        }
-      }
+    def iterator(): Iterator[A] = underlying.iterator().patch(from, other.iterator(), replaced)
   }
 
   case class ZipWithIndex[A](underlying: Iterable[A]) extends View[(A, Int)] {

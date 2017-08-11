@@ -14,21 +14,21 @@ import scala.Predef._
 @Warmup(iterations = 12)
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
-class ScalaListBenchmark {
+class ScalaArrayBenchmark {
 
   @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980"/*, "73121", "120000"*/))
   var size: Int = _
 
-  var xs: scala.List[Long] = _
-  var xss: scala.Array[scala.List[Long]] = _
-  var zipped: scala.List[(Long, Long)] = _
+  var xs: scala.Array[Long] = _
+  var xss: scala.Array[scala.Array[Long]] = _
+  var zipped: scala.Array[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
   var randomIndices2: scala.Array[Int] = _
-  var randomXss: scala.Array[scala.List[Long]] = _
+  var randomXss: scala.Array[scala.Array[Long]] = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection() = scala.List((1 to size).map(_.toLong): _*)
+    def freshCollection() = scala.Array((1 to size).map(_.toLong): _*)
     xs = freshCollection()
     xss = scala.Array.fill(1000)(freshCollection())
     zipped = xs.map(x => (x, x))
@@ -41,10 +41,10 @@ class ScalaListBenchmark {
 
   @Benchmark
   def prepend(bh: Blackhole): Unit = {
-    var ys = scala.List.empty[Long]
+    var ys = scala.Array.empty[Long]
     var i = 0L
     while (i < size) {
-      ys = i :: ys
+      ys = i +: ys
       i = i + 1
     }
     bh.consume(ys)
@@ -52,7 +52,7 @@ class ScalaListBenchmark {
 
   @Benchmark
   def append(bh: Blackhole): Unit = {
-    var ys = scala.List.empty[Long]
+    var ys = scala.Array.empty[Long]
     var i = 0L
     while (i < size) {
       ys = ys :+ i
@@ -63,11 +63,11 @@ class ScalaListBenchmark {
 
   @Benchmark
   def prependAppend(bh: Blackhole): Unit = {
-    var ys = scala.List.empty[Long]
+    var ys = scala.Array.empty[Long]
     var i = 0L
     while (i < size) {
       if ((i & 1) == 1) ys = ys :+ i
-      else ys = i :: ys
+      else ys = i +: ys
       i = i + 1
     }
     bh.consume(ys)
@@ -81,11 +81,11 @@ class ScalaListBenchmark {
 
   @Benchmark
   def prependAllAppendAll(bh: Blackhole): Unit = {
-    var ys = scala.List.empty[Long]
+    var ys = scala.Array.empty[Long]
     var i = 0L
     while (i < size) {
-      if ((i & 1) == 1) ys = ys ++ scala.List[Long](1, 2, 3)
-      else ys = scala.List[Long](1, 2, 3) ++: ys
+      if ((i & 1) == 1) ys = ys ++ scala.Array[Long](1, 2, 3)
+      else ys = scala.Array[Long](1, 2, 3) ++: ys
       i = i + 1
     }
     bh.consume(ys)

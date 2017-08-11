@@ -35,7 +35,7 @@ class ArrayBufferBenchmark {
 
   @Benchmark
   //  @OperationsPerInvocation(size)
-  def snoc(bh: Blackhole): Unit = {
+  def cons(bh: Blackhole): Unit = {
     var ys = ArrayBuffer.empty[Long]
     var i = 0L
     while (i < size) {
@@ -56,6 +56,9 @@ class ArrayBufferBenchmark {
 
   @Benchmark
   def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
+
+  @Benchmark
+  def distinct(bh: Blackhole): Unit = bh.consume(xs.distinct)
 
   @Benchmark
     //@OperationsPerInvocation(size)

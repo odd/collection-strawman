@@ -582,6 +582,19 @@ class StrawmanTest {
   }
 
   @Test
+  def distinct(): Unit = {
+    // Lazy collections distinct
+    assert(LazyList[Int]().distinct.isEmpty)
+    assert(LazyList(1,1,1,1).distinct.equals(LazyList(1)))
+    assert(LazyList(1,2,3,1).distinct.equals(LazyList(1,2,3)))
+
+    // Strict collections distinct
+    assert(List().distinct.equals(List()))
+    assert(List(1,1,1,1).distinct.equals(List(1)))
+    assert(List(1,2,3,1).distinct.equals(List(1,2,3)))
+  }
+
+  @Test
   def linearSeqSize(): Unit = {
     val list = 1 :: 2 :: 3 :: Nil
     assert(list.length == list.size && list.size == 3)
@@ -615,6 +628,7 @@ class StrawmanTest {
     lazyListOps(intsLzy)
     spandexOps(Spandex(1, 2, 3))
     equality()
+    distinct()
     linearSeqSize()
   }
 }

@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 
 import scala.{Any, Array, Boolean, IllegalArgumentException, Int, NoSuchElementException, None, Nothing, Option, Some, StringContext, Unit, `inline`, math, throws}
 import scala.Predef.{intWrapper, require}
-import strawman.collection.mutable.ArrayBuffer
+import strawman.collection.mutable.{ArrayBuffer, HashMap}
 
 import scala.annotation.tailrec
 import scala.annotation.unchecked.uncheckedVariance
@@ -399,6 +399,46 @@ trait Iterator[+A] extends IterableOnce[A] { self =>
       else Iterator.empty.next()
   }
 
+  /**
+    *  Builds a new iterator from this one without any duplicated elements on it.
+    *  @return iterator with intermediate results
+    *
+    *  @note   Reuse: $consumesIterator
+    */
+  def distinct: Iterator[A] = new Iterator[A] {
+
+    private val traversedValues = mutable.HashSet.empty[A]
+    private var nextElementDefined: Boolean = false
+    private var nextElement: A = _
+
+    def hasNext: Boolean = {
+      @tailrec
+      def loop(): Boolean = {
+        if (!self.hasNext) false
+        else {
+          nextElement = self.next()
+          if (traversedValues.contains(nextElement)) {
+            loop()
+          } else {
+            traversedValues += nextElement
+            nextElementDefined = true
+            true
+          }
+        }
+      }
+
+      nextElementDefined || loop()
+    }
+
+    def next(): A =
+      if (hasNext) {
+        nextElementDefined = false
+        nextElement
+      } else {
+        Iterator.empty.next()
+      }
+  }
+
   def map[B](f: A => B): Iterator[B] = new Iterator[B] {
     def hasNext = self.hasNext
     def next() = f(self.next())
@@ -531,6 +571,50 @@ trait Iterator[+A] extends IterableOnce[A] { self =>
     // If *both* of them have no elements then the collections are the same
     hasNext == those.hasNext
   }
+
+  /** Returns this iterator with patched values.
+    * Patching at negative indices is the same as patching starting at 0.
+    * Patching at indices at or larger than the length of the original iterator appends the patch to the end.
+    * If more values are replaced than actually exist, the excess is ignored.
+    *
+    *  @param from       The start index from which to patch
+    *  @param patchElems The iterator of patch values
+    *  @param replaced   The number of values in the original iterator that are replaced by the patch.
+    *  @note           Reuse: $consumesTwoAndProducesOneIterator
+    */
+  def patch[B >: A](from: Int, patchElems: Iterator[B], replaced: Int): Iterator[B] =
+    new Iterator[B] {
+      private var origElems = self
+      private var i = if (from > 0) from else 0 // Counts down, switch to patch on 0, -1 means use patch first
+      def hasNext: Boolean = {
+        if (i == 0) {
+          origElems = origElems drop replaced
+          i = -1
+        }
+        origElems.hasNext || patchElems.hasNext
+      }
+
+      def next(): B = {
+        if (i == 0) {
+          origElems = origElems drop replaced
+          i = -1
+        }
+        if (i < 0) {
+          if (patchElems.hasNext) patchElems.next()
+          else origElems.next()
+        }
+        else {
+          if (origElems.hasNext) {
+            i -= 1
+            origElems.next()
+          }
+          else {
+            i = -1
+            patchElems.next()
+          }
+        }
+      }
+    }
 }
 
 object Iterator {

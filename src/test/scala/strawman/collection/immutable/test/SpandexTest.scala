@@ -687,24 +687,42 @@ class SpandexTest {
   @Test
   def testPatchToRear(): Unit = {
     assertEquals("Empty with empty at rear", Spandex.empty, Spandex.empty.patch(0, Spandex.empty))
+    assertEquals("Empty reversed with empty at rear", Spandex.empty, Spandex.empty.reverse.patch(0, Spandex.empty))
     assertEquals("Empty with single at rear", Spandex(1), Spandex.empty.patch(0, Spandex(1)))
+    assertEquals("Empty reversed with single at rear", Spandex(1), Spandex.empty.reverse.patch(0, Spandex(1)))
     assertEquals("Single with empty at rear", Spandex(1), Spandex(1).patch(1, Spandex.empty))
+    assertEquals("Single reversed with empty at rear", Spandex(1), Spandex(1).reverse.patch(1, Spandex.empty))
     assertEquals("Single with single at rear replacing 0", Spandex(2, 1), Spandex(2).patch(1, Spandex(1)))
+    assertEquals("Single reversed with single at rear replacing 0", Spandex(2, 1), Spandex(2).reverse.patch(1, Spandex(1)))
     assertEquals("Single with multiple at rear", Spandex(4, 1, 2, 3), Spandex(4).patch(1, Spandex(1, 2, 3)))
+    assertEquals("Single reversed with multiple at rear", Spandex(4, 1, 2, 3), Spandex(4).reverse.patch(1, Spandex(1, 2, 3)))
     assertEquals("Multiple with empty at rear", Spandex(1, 2, 3), Spandex(1, 2, 3).patch(3, Spandex.empty))
+    assertEquals("Multiple reversed with empty at rear", Spandex(3, 2, 1), Spandex(1, 2, 3).reverse.patch(3, Spandex.empty))
     assertEquals("Multiple with single at rear", Spandex(1, 2, 3, 4), Spandex(1, 2, 3).patch(3, Spandex(4)))
+    assertEquals("Multiple reversed with single at rear", Spandex(3, 2, 1, 4), Spandex(1, 2, 3).reverse.patch(3, Spandex(4)))
+    assertEquals("Multiple with multiple at rear", Spandex(1, 2, 3, 4, 5, 6), Spandex(1, 2, 3).patch(3, Spandex(4, 5, 6)))
+    assertEquals("Multiple reversed with multiple at rear", Spandex(3, 2, 1, 4, 5, 6), Spandex(1, 2, 3).reverse.patch(3, Spandex(4, 5, 6)))
   }
   @Test
   def testPatchInMiddle(): Unit = {
     assertEquals("Multiple with empty in middle replacing 0", Spandex(1, 2, 3), Spandex(1, 2, 3).patch(1, Spandex.empty))
+    assertEquals("Multiple reversed with empty in middle replacing 0", Spandex(3, 2, 1), Spandex(1, 2, 3).reverse.patch(1, Spandex.empty))
     assertEquals("Multiple with empty in middle replacing 1", Spandex(1, 3), Spandex(1, 2, 3).patch(1, Spandex.empty, 1))
+    assertEquals("Multiple reversed with empty in middle replacing 1", Spandex(3, 1), Spandex(1, 2, 3).reverse.patch(1, Spandex.empty, 1))
     assertEquals("Multiple with empty in middle replacing max", Spandex(1), Spandex(1, 2, 3).patch(1, Spandex.empty, 245))
+    assertEquals("Multiple reversed with empty in middle replacing max", Spandex(3), Spandex(1, 2, 3).reverse.patch(1, Spandex.empty, 245))
     assertEquals("Multiple with single in middle replacing 0", Spandex(1, 4, 2, 3), Spandex(1, 2, 3).patch(1, Spandex(4)))
+    assertEquals("Multiple reversed with single in middle replacing 0", Spandex(3, 4, 2, 1), Spandex(1, 2, 3).reverse.patch(1, Spandex(4)))
     assertEquals("Multiple with single in middle replacing 1", Spandex(1, 4, 3), Spandex(1, 2, 3).patch(1, Spandex(4), 1))
+    assertEquals("Multiple reversed with single in middle replacing 1", Spandex(3, 4, 1), Spandex(1, 2, 3).reverse.patch(1, Spandex(4), 1))
     assertEquals("Multiple with single in middle replacing max", Spandex(1, 4), Spandex(1, 2, 3).patch(1, Spandex(4), 245))
+    assertEquals("Multiple reversed with single in middle replacing max", Spandex(3, 4), Spandex(1, 2, 3).reverse.patch(1, Spandex(4), 245))
     assertEquals("Multiple with multiple in middle replacing 0", Spandex(1, 4, 5, 6, 2, 3), Spandex(1, 2, 3).patch(1, Spandex(4, 5, 6)))
+    assertEquals("Multiple reversed with multiple in middle replacing 0", Spandex(3, 4, 5, 6, 2, 1), Spandex(1, 2, 3).reverse.patch(1, Spandex(4, 5, 6)))
     assertEquals("Multiple with multiple in middle replacing 1", Spandex(1, 4, 5, 6, 3), Spandex(1, 2, 3).patch(1, Spandex(4, 5, 6), 1))
+    assertEquals("Multiple reversed with multiple in middle replacing 1", Spandex(3, 4, 5, 6, 1), Spandex(1, 2, 3).reverse.patch(1, Spandex(4, 5, 6), 1))
     assertEquals("Multiple with multiple in middle replacing max", Spandex(1, 4, 5, 6), Spandex(1, 2, 3).patch(1, Spandex(4, 5, 6), 245))
+    assertEquals("Multiple reversed with multiple in middle replacing max", Spandex(3, 4, 5, 6), Spandex(1, 2, 3).reverse.patch(1, Spandex(4, 5, 6), 245))
   }
   @Test
   def testShrink(): Unit = {
@@ -747,5 +765,22 @@ class SpandexTest {
     assertEquals("after removing 385 out of 512 capacity is 128", 128, s.primary.elements.length)
     s = s.slice(0, 2)
     assertEquals("after keeping 2 out of 128 capacity is 8", 8, s.primary.elements.length)
+  }
+  @Test
+  def testPadTo(): Unit = {
+    assertEquals("empty to 0 is empty", Spandex.empty, Spandex.empty.padTo(0, 0))
+    assertEquals("empty to 3", Spandex(0, 0, 0), Spandex.empty.padTo(3, 0))
+    assertEquals("single to 0 is same", Spandex(2), Spandex(2).padTo(0, 0))
+    assertEquals("single to 1 is same", Spandex(2), Spandex(2).padTo(1, 0))
+    assertEquals("single to 2", Spandex(2, 0), Spandex(2).padTo(2, 0))
+    assertEquals("single to 3", Spandex(2, 0, 0), Spandex(2).padTo(3, 0))
+    assertEquals("multiple to 0 is same", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).padTo(0, 0))
+    assertEquals("reversed multiple to 0 is same", Spandex(12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).reverse.padTo(0, 0))
+    assertEquals("multiple to 1 is same", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).padTo(1, 0))
+    assertEquals("reversed multiple to 1 is same", Spandex(12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).reverse.padTo(1, 0))
+    assertEquals("multiple to 12 is same", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).padTo(12, 0))
+    assertEquals("reversed multiple to 12 is same", Spandex(12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).reverse.padTo(12, 0))
+    assertEquals("multiple to 24", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).padTo(24, 0))
+    assertEquals("reversed multiple to 24", Spandex(12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).reverse.padTo(24, 0))
   }
 }

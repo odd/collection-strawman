@@ -4,7 +4,7 @@ package immutable
 
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import scala.{Any, AnyRef, Array, IndexOutOfBoundsException, ArrayIndexOutOfBoundsException, Boolean, Int, Long, NoSuchElementException, UnsupportedOperationException, Nothing, StringContext, Unit, `inline`}
-import scala.Predef.{String, genericWrapArray, intWrapper}
+import scala.Predef.{String, genericWrapArray, intWrapper, <:<}
 import scala.math
 import scala.math._
 import scala.reflect.ClassTag
@@ -131,6 +131,12 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
     slice(0, l - (n min l))
   }
 
+  override def span(p: A => Boolean): (Spandex[A], Spandex[A]) = {
+    val prefix = takeWhile(p)
+    val suffix = drop(prefix.size)
+    (prefix, suffix)
+  }
+
   override final def head: A =
     if (isEmpty) throw new UnsupportedOperationException
     else fetch(0)
@@ -155,6 +161,10 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       val (rearStartIndex, rearStopIndex) = Spandex.rearIndexes(start, stop)
       Spandex.resize(this, size, frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex)
    }
+
+  override def padTo[B >: A](len: Int, elem: B) =
+    if (len <= size) this
+    else patch(size, Iterator.continually(elem).take(len - size))
 
   override final def prepend[B >: A](elem: B): Spandex[B] =
     if (isEmpty) Spandex(elem)
@@ -216,6 +226,20 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
     case _ => fromIterable[(A, B)](View.Zip[A, B](coll, xs))
   }
 
+  override def unzip[A1, A2](implicit asPair: <:<[A, (A1, A2)]) = {
+    val arr1 = new Array[Any](capacity)
+    val arr2 = new Array[Any](capacity)
+    var i = 0
+    val sz = size
+    while (i < sz) {
+      val (a1, a2) = asPair(fetch(i))
+      arr1(i) = a1
+      arr2(i) = a2
+      i += 1
+    }
+    (Spandex.create(arr1, 0, sz), Spandex.create(arr2, 0, sz))
+  }
+
   override final def iterator(): Iterator[A] =
     new Iterator[A] {
       private[this] final val n = Spandex.this.size
@@ -242,6 +266,8 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
     if (isEmpty) Spandex.empty
     else if (size == 1) this
     else Spandex.create(primary, stop, start)
+
+  override protected[this] def reversed: Spandex[A] = reverse
 
   override final def foldLeft[B](z: B)(op: (B, A) => B): B = {
     var acc = z

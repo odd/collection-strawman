@@ -16,37 +16,42 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class SpandexBenchmark {
 
-  @Param(scala.Array("0"/*, "1", "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980", "73121", "120000"))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980"/*, "73121", "120000"*/))
   var size: Int = _
 
   var xs: Spandex[Long] = _
   var xss: scala.Array[Spandex[Long]] = _
+  var zipped: Spandex[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
+  var randomIndices2: scala.Array[Int] = _
+  var randomXss: scala.Array[Spandex[Long]] = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
     def freshCollection() = Spandex((1 to size).map(_.toLong): _*)
     xs = freshCollection()
     xss = scala.Array.fill(1000)(freshCollection())
+    zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
+      randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
+      randomXss = scala.Array.fill(1000)(freshCollection().take(scala.util.Random.nextInt(size)))
     }
   }
 
   @Benchmark
-  def cons(bh: Blackhole): Unit = {
+  def prepend(bh: Blackhole): Unit = {
     var ys = Spandex.empty[Long]
     var i = 0L
     while (i < size) {
-      ys = i +: ys // Note: In the case of TreeSet, always inserting elements that are already ordered creates a bias
+      ys = i +: ys
       i = i + 1
     }
     bh.consume(ys)
   }
 
   @Benchmark
-  //@OperationsPerInvocation(size)
-  def snoc(bh: Blackhole): Unit = {
+  def append(bh: Blackhole): Unit = {
     var ys = Spandex.empty[Long]
     var i = 0L
     while (i < size) {
@@ -57,27 +62,59 @@ class SpandexBenchmark {
   }
 
   @Benchmark
-  def uncons(bh: Blackhole): Unit = bh.consume(xs.tail)
+  def prependAppend(bh: Blackhole): Unit = {
+    var ys = Spandex.empty[Long]
+    var i = 0L
+    while (i < size) {
+      if ((i & 1) == 1) ys = ys :+ i
+      else ys = i +: ys
+      i = i + 1
+    }
+    bh.consume(ys)
+  }
 
   @Benchmark
-  def unsnoc(bh: Blackhole): Unit = bh.consume(xs.init)
+  def prependAll(bh: Blackhole): Unit = bh.consume(xs ++: xs)
 
   @Benchmark
-  def concat(bh: Blackhole): Unit = bh.consume(xs ++ xs)
+  def appendAll(bh: Blackhole): Unit = bh.consume(xs :++ xs)
 
   @Benchmark
-  def prependAll(bh: Blackhole): Unit = bh.consume(xs.prependAll(xs))
+  def prependAllAppendAll(bh: Blackhole): Unit = {
+    var ys = Spandex.empty[Long]
+    var i = 0L
+    while (i < size) {
+      if ((i & 1) == 1) ys = ys :++ Spandex[Long](1, 2, 3)
+      else ys = Spandex[Long](1, 2, 3) ++: ys
+      i = i + 1
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
+  def tail(bh: Blackhole): Unit = bh.consume(xs.tail)
+
+  @Benchmark
+  def init(bh: Blackhole): Unit = bh.consume(xs.init)
 
   @Benchmark
   def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
-  //@OperationsPerInvocation(size)
-  def foreach_while(bh: Blackhole): Unit = {
+  def foreach_headTail(bh: Blackhole): Unit = {
     var ys = xs
     while (ys.nonEmpty) {
       bh.consume(ys.head)
       ys = ys.tail
+    }
+  }
+
+  @Benchmark
+  def foreach_initLast(bh: Blackhole): Unit = {
+    var ys = xs
+    while (ys.nonEmpty) {
+      bh.consume(ys.last)
+      ys = ys.init
     }
   }
 
@@ -93,8 +130,11 @@ class SpandexBenchmark {
   }
 
   @Benchmark
+  def distinct(bh: Blackhole): Unit = bh.consume(xs.distinct)
+
+  @Benchmark
   @OperationsPerInvocation(1000)
-  def lookupLast(bh: Blackhole): Unit = {
+  def lookup_last(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
       bh.consume(xss(i)(size - 1))
@@ -104,7 +144,7 @@ class SpandexBenchmark {
 
   @Benchmark
   @OperationsPerInvocation(1000)
-  def randomLookup(bh: Blackhole): Unit = {
+  def lookup_random(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
       bh.consume(xs(randomIndices(i)))
@@ -114,6 +154,36 @@ class SpandexBenchmark {
 
   @Benchmark
   def map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
+
+  @Benchmark
+  @OperationsPerInvocation(1000)
+  def patch(bh: Blackhole): Unit = {
+    var i = 0
+    while (i < 1000) {
+      val from = randomIndices(i)
+      val replaced = randomIndices2(i)
+      bh.consume(xs.patch(from, randomXss(i), replaced))
+      i = i + 1
+    }
+  }
+
+  @Benchmark
+  @OperationsPerInvocation(100)
+  def span(bh: Blackhole): Unit = {
+    var i = 0
+    while (i < 100) {
+      val (xs1, xs2) = xs.span(x => x < randomIndices(i))
+      bh.consume(xs1)
+      bh.consume(xs2)
+      i += 1
+    }
+  }
+
+  @Benchmark
+  def unzip(bh: Blackhole): Unit = bh.consume(zipped.unzip)
+
+  @Benchmark
+  def padTo(bh: Blackhole): Unit = bh.consume(xs.padTo(size * 2, 42))
 
   @Benchmark
   def reverse(bh: Blackhole): Any = bh.consume(xs.reverse)
@@ -139,36 +209,11 @@ class SpandexBenchmark {
   }
 
   @Benchmark
-  //@OperationsPerInvocation(size)
-  def consSnoc(bh: Blackhole): Unit = {
-    var ys = Spandex.empty[Long]
-    var i = 0L
-    while (i < size) {
-      if ((i & 1) == 1) ys = ys :+ i
-      else ys = i +: ys
-      i = i + 1
-    }
-    bh.consume(ys)
-  }
-
-  @Benchmark
   @OperationsPerInvocation(1000)
-  def randomUpdate(bh: Blackhole): Unit = {
+  def updated(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
       bh.consume(xs.updated(randomIndices(i), i))
-      i = i + 1
-    }
-  }
-
-  @Benchmark
-  @OperationsPerInvocation(1000)
-  def randomPatch(bh: Blackhole): Unit = {
-    var i = 0
-    while (i < 1000) {
-      val from = randomIndices(i)
-      val patch = scala.util.Random.nextInt(size)
-      bh.consume(xs.patch(from, xss(i).take(from), scala.util.Random.nextInt(xs.length)))
       i = i + 1
     }
   }
