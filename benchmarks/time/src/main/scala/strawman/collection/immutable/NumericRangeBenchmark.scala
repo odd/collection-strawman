@@ -5,8 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.{Any, AnyRef, Int, Long, Unit}
-import scala.Predef._
+import scala.{Any, AnyRef, Int, Unit}
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -14,24 +13,22 @@ import scala.Predef._
 @Warmup(iterations = 12)
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
-class ScalaArrayBenchmark {
+class NumericRangeBenchmark {
 
   @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980"/*, "73121", "120000"*/))
   var size: Int = _
 
-  var xs: scala.Array[Long] = _
-  var xss: scala.Array[scala.Array[Long]] = _
-  var zipped: scala.Array[(Long, Long)] = _
+  var xs: NumericRange[Int] = _
+  var xss: scala.Array[NumericRange[Int]] = _
   var randomIndices: scala.Array[Int] = _
   var randomIndices2: scala.Array[Int] = _
-  var randomXss: scala.Array[scala.Array[Long]] = _
+  var randomXss: scala.Array[NumericRange[Int]] = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection() = scala.Array((1 to size).map(_.toLong): _*)
+    def freshCollection() = NumericRange.inclusive(1, size, 1)
     xs = freshCollection()
     xss = scala.Array.fill(1000)(freshCollection())
-    zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
       randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
@@ -40,56 +37,10 @@ class ScalaArrayBenchmark {
   }
 
   @Benchmark
-  def prepend(bh: Blackhole): Unit = {
-    var ys = scala.Array.empty[Long]
-    var i = 0L
-    while (i < size) {
-      ys = i +: ys
-      i = i + 1
-    }
-    bh.consume(ys)
-  }
-
-  @Benchmark
-  def append(bh: Blackhole): Unit = {
-    var ys = scala.Array.empty[Long]
-    var i = 0L
-    while (i < size) {
-      ys = ys :+ i
-      i += 1
-    }
-    bh.consume(ys)
-  }
-
-  @Benchmark
-  def prependAppend(bh: Blackhole): Unit = {
-    var ys = scala.Array.empty[Long]
-    var i = 0L
-    while (i < size) {
-      if ((i & 1) == 1) ys = ys :+ i
-      else ys = i +: ys
-      i = i + 1
-    }
-    bh.consume(ys)
-  }
-
-  @Benchmark
   def prependAll(bh: Blackhole): Unit = bh.consume(xs ++: xs)
 
   @Benchmark
-  def appendAll(bh: Blackhole): Unit = bh.consume(xs ++ xs)
-
-  @Benchmark
-  def prependAllAppendAll(bh: Blackhole): Unit = {
-    var ys = scala.Array.empty[Long]
-    var i = 0L
-    while (i < size) {
-      if ((i & 1) == 1) ys = ys ++ scala.Array[Long](1, 2, 3)
-      else ys = scala.Array[Long](1, 2, 3) ++: ys
-      i = i + 1
-    }
-    bh.consume(ys)
-  }
+  def appendAll(bh: Blackhole): Unit = bh.consume(xs :++ xs)
 
   @Benchmark
   def tail(bh: Blackhole): Unit = bh.consume(xs.tail)
@@ -98,10 +49,10 @@ class ScalaArrayBenchmark {
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
 
   @Benchmark
-  def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
+  def loop_foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
-  def foreach_headTail(bh: Blackhole): Unit = {
+  def loop_headTail(bh: Blackhole): Unit = {
     var ys = xs
     while (ys.nonEmpty) {
       bh.consume(ys.head)
@@ -110,18 +61,9 @@ class ScalaArrayBenchmark {
   }
 
   @Benchmark
-  def foreach_initLast(bh: Blackhole): Unit = {
-    var ys = xs
-    while (ys.nonEmpty) {
-      bh.consume(ys.last)
-      ys = ys.init
-    }
-  }
-
-  @Benchmark
-  def iterator(bh: Blackhole): Any = {
+  def loop_iterator(bh: Blackhole): Any = {
     var n = 0
-    val it = xs.iterator
+    val it = xs.iterator()
     while (it.hasNext) {
       bh.consume(it.next())
       n += 1
@@ -178,9 +120,6 @@ class ScalaArrayBenchmark {
       i += 1
     }
   }
-
-  @Benchmark
-  def unzip(bh: Blackhole): Unit = bh.consume(zipped.unzip)
 
   @Benchmark
   def padTo(bh: Blackhole): Unit = bh.consume(xs.padTo(size * 2, 42))

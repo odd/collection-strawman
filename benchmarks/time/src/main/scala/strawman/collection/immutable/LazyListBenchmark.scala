@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.{Any, AnyRef, Int, Long, Unit}
+import scala.{Any, AnyRef, Int, Long, Unit, math}
 import scala.Predef.intWrapper
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
@@ -82,10 +82,11 @@ class LazyListBenchmark {
   @Benchmark
   def prependAllAppendAll(bh: Blackhole): Unit = {
     var ys = LazyList.empty[Long]
+    val ys2 = xss(0).take(3)
     var i = 0L
     while (i < size) {
-      if ((i & 1) == 1) ys = ys :++ LazyList[Long](1, 2, 3)
-      else ys =  LazyList[Long](1, 2, 3) ++: ys
+      if ((i & 1) == 1) ys = ys :++ ys2
+      else ys = ys2 ++: ys
       i = i + 1
     }
     bh.consume(ys)
@@ -98,10 +99,10 @@ class LazyListBenchmark {
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
 
   @Benchmark
-  def foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
+  def loop_foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
-  def foreach_headTail(bh: Blackhole): Unit = {
+  def loop_headTail(bh: Blackhole): Unit = {
     var ys = xs
     while (ys.nonEmpty) {
       bh.consume(ys.head)
@@ -110,7 +111,7 @@ class LazyListBenchmark {
   }
 
   @Benchmark
-  def foreach_initLast(bh: Blackhole): Unit = {
+  def loop_initLast(bh: Blackhole): Unit = {
     var ys = xs
     while (ys.nonEmpty) {
       bh.consume(ys.last)
@@ -119,7 +120,7 @@ class LazyListBenchmark {
   }
 
   @Benchmark
-  def iterator(bh: Blackhole): Any = {
+  def loop_iterator(bh: Blackhole): Any = {
     var n = 0
     val it = xs.iterator()
     while (it.hasNext) {

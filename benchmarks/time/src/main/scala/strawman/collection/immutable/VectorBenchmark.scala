@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.{Any, AnyRef, Int, Long, Unit}
+import scala.{Any, AnyRef, Int, Long, Unit, math}
 import scala.Predef.intWrapper
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
@@ -82,10 +82,11 @@ class VectorBenchmark {
   @Benchmark
   def prependAllAppendAll(bh: Blackhole): Unit = {
     var ys = Vector.empty[Long]
+    val ys2 = xss(0).take(3)
     var i = 0L
     while (i < size) {
-      if ((i & 1) == 1) ys = ys :++ Vector[Long](1, 2, 3)
-      else ys = Vector[Long](1, 2, 3) ++: ys
+      if ((i & 1) == 1) ys = ys :++ ys2
+      else ys = ys2 ++: ys
       i = i + 1
     }
     bh.consume(ys)
