@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.{Any, AnyRef, Int, Long, Unit, math}
+import scala.{Any, AnyRef, Int, Long, Unit}
 import scala.Predef.intWrapper
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
@@ -44,7 +44,7 @@ class ScalaTreeSetBenchmark {
     var ys = scala.collection.immutable.TreeSet.empty[Long]
     var i = 0L
     while (i < size) {
-      ys = ys + i
+      ys += i
       i += 1
     }
     bh.consume(ys)
@@ -81,14 +81,11 @@ class ScalaTreeSetBenchmark {
   }
 
   @Benchmark
-  def loop_iterator(bh: Blackhole): Any = {
-    var n = 0
+  def loop_iterator(bh: Blackhole): Unit = {
     val it = xs.iterator
     while (it.hasNext) {
       bh.consume(it.next())
-      n += 1
     }
-    bh.consume(n)
   }
 
   @Benchmark
@@ -96,8 +93,8 @@ class ScalaTreeSetBenchmark {
   def contains(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
-      bh.consume(xss(i)(i))
-      i = i + 1
+      bh.consume(xss(i).contains(i))
+      i += 1
     }
   }
 
