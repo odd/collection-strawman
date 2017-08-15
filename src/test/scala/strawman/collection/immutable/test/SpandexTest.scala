@@ -247,8 +247,6 @@ class SpandexTest {
     assertEquals("on multiple over front", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), List(1, 2, 3, 4) ++: Spandex(5, 6, 7, 8, 9, 10, 11))
     assertEquals("on reversed multiple over front", Spandex(1, 2, 3, 4, 11, 10, 9, 8, 7, 6, 5), List(1, 2, 3, 4) ++: Spandex(5, 6, 7, 8, 9, 10, 11).reverse)
     assertEquals("with list on empty", Spandex(1, 2, 3), List(1, 2, 3) ++: Spandex.empty)
-    assertEquals("with iterator", Spandex(1, 2, 3, 4, 5, 6, 7, 8, 9), List(1, 2, 3, 4).iterator() ++: Spandex(5, 6, 7, 8, 9))
-    assertEquals("with iterator on reversed", Spandex(1, 2, 3, 4, 9, 8, 7, 6, 5), List(1, 2, 3, 4).iterator() ++: Spandex(5, 6, 7, 8, 9).reverse)
     assertEquals("with multiple lists", Spandex(-3, -2, -1, 0, 1, 2, 3, 4), List(-3, -2) ++: List(-1, 0) ++: 1 +: Spandex(2, 3, 4))
     assertEquals("with multiple lists reversed", Spandex(-3, -2, 4, 3, 2, 1, 0, -1), List(-3, -2) ++: (List(-1, 0) ++: 1 +: Spandex(2, 3, 4)).reverse)
   }

@@ -178,7 +178,9 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
     else if (isReversed && primary.prependElement(elem, stop)) Spandex.create(primary, start, stop - 1)
     else Spandex.grow(this, Spandex.capacitate((size - 1) * 2)) :+ elem
 
-  override final def prependAll[B >: A](xs: collection.IterableOnce[B]): Spandex[B] =
+  override final def prependAll[B >: A](xs: collection.Iterable[B]): Spandex[B] = prependAll1(xs)
+
+  private final def prependAll1[B >: A](xs: collection.IterableOnce[B]): Spandex[B] =
     xs match {
       case _ if this.isEmpty => Spandex.fromIterable(xs)
       case that: Iterable[B] if that.knownSize == 0 || that.isEmpty => this
@@ -191,7 +193,10 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       case _ => Spandex.fromIterable(xs).concat(this)
     }
 
-  override final def appendAll[B >: A](xs: IterableOnce[B]): Spandex[B] =
+
+  override final def appendAll[B >: A](xs: collection.Iterable[B]): Spandex[B] = appendAll1(xs)
+
+  private final def appendAll1[B >: A](xs: collection.IterableOnce[B]): Spandex[B] =
     xs match {
       case _ if this.isEmpty => Spandex.fromIterable(xs)
       case that: Iterable[B] if that.knownSize == 0 || that.isEmpty => this
@@ -218,7 +223,7 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       new Spandex.Primary[B](array, start, stop)
     }
 
-  override final def zip[B](xs: IterableOnce[B]): Spandex[(A, B)] = xs match {
+  override final def zip[B](xs: collection.Iterable[B]): Spandex[(A, B)] = xs match {
     case that: Spandex[B] =>
       Spandex.tabulate(this.size min that.size) { i =>
         (this.apply(i), that.apply(i))
@@ -302,10 +307,10 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
 
   override final def patch[B >: A](from: Int, xs: IterableOnce[B], replaced: Int = 0): Spandex[B] = {
     if (from < 0 || from > size) throw new IndexOutOfBoundsException(from.toString)
-    else if (from == 0 && (replaced max 0) == 0) prependAll(xs)
-    else if (from == 0) coll.drop(replaced).prependAll(xs)
-    else if (from == size) coll.appendAll(xs)
-    else coll.take(from).appendAll(xs).appendAll(coll.slice(from + replaced, size))
+    else if (from == 0 && (replaced max 0) == 0) prependAll1(xs)
+    else if (from == 0) coll.drop(replaced).prependAll1(xs)
+    else if (from == size) coll.appendAll1(xs)
+    else coll.take(from).appendAll1(xs).appendAll1(coll.slice(from + replaced, size))
   }
 
   override final def toArray[B >: A: ClassTag]: Array[B] =
@@ -328,7 +333,7 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
   override protected[this] final def fromIterable[B](c: collection.Iterable[B]): Spandex[B] =
     Spandex.fromIterable(c)
 
-  override def iterableFactory: IterableFactory[Spandex] = Spandex
+  override def iterableFactory: SeqFactory[Spandex] = Spandex
 
   protected[this] final def fromSpecificIterable(coll: collection.Iterable[A]): Spandex[A] = fromIterable(coll)
 
@@ -337,7 +342,7 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
   override final def className = "Spandex"
 }
 
-object Spandex extends IterableFactory[Spandex] {
+object Spandex extends SeqFactory[Spandex] {
   private[immutable] class Primary[+A](
     override val elements: scala.Array[Any],
     x: Int,
@@ -494,7 +499,7 @@ object Spandex extends IterableFactory[Spandex] {
     (a.isInstanceOf[AnyRef] && a.asInstanceOf[AnyRef].eq(b.asInstanceOf[AnyRef]))
     || (!a.isInstanceOf[AnyRef] && a == b))
 
-  def tabulate[A](n: Int)(f: Int => A): Spandex[A] =
+  override def tabulate[A](n: Int)(f: Int => A): Spandex[A] =
     if (n == 0) Empty
     else {
       val capacity = capacitate(n)
