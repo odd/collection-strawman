@@ -70,12 +70,11 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
   private[immutable] def primary: Spandex.Primary[A]
 
   protected def elements: Array[Any] = primary.elements
-
-  protected def capacity: Int = elements.length
+  protected final def capacity: Int = elements.length
 
   //@`inline` // Causes problems with errors and eternal inlining when running test cases on Dotty
-  private def isReversed: Boolean = start > stop
-  private def nonReversed: Boolean = start <= stop
+  private final def isReversed: Boolean = start > stop
+  private final def nonReversed: Boolean = start <= stop
 
   @`inline`
   protected final def element(i: Int): A =
@@ -157,14 +156,16 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
     if (size == 0) Spandex.Empty
     else if (size == capacity) this
     else {
-      val (frontStartIndex, frontStopIndex) = Spandex.frontIndexes(start, stop, size)
-      val (rearStartIndex, rearStopIndex) = Spandex.rearIndexes(start, stop)
+      var a = math.min(start, stop)
+      var b = math.max(start, stop)
+      val (frontStartIndex, frontStopIndex) = Spandex.frontIndexes(a, b, size)
+      val (rearStartIndex, rearStopIndex) = Spandex.rearIndexes(a, b)
       Spandex.resize(this, size, frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex)
    }
 
-  override def padTo[B >: A](len: Int, elem: B) =
+  override def padTo[B >: A](len: Int, elem: B): Spandex[B] =
     if (len <= size) this
-    else patch(size, Iterator.continually(elem).take(len - size))
+    else appendAll1(Iterator.continually(elem).take(len - size))
 
   override final def prepend[B >: A](elem: B): Spandex[B] =
     if (isEmpty) Spandex(elem)
@@ -182,31 +183,48 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
 
   private final def prependAll1[B >: A](xs: collection.IterableOnce[B]): Spandex[B] =
     xs match {
-      case _ if this.isEmpty => Spandex.fromIterable(xs)
-      case that: Iterable[B] if that.knownSize == 0 || that.isEmpty => this
-      case that: Spandex[B] if this.isReversed || that.isReversed => fromIterable(View.Concat(that, coll))
+      case that: Iterable[B] if that.knownSize == 0 || that.isEmpty =>
+        this
+      case that: Iterable[B] if that.knownSize == 1 =>
+        prepend(that.head)
+      case that: Spandex[B] if this.isReversed || that.isReversed =>
+        Spandex.fromIterable(View.Concat(that, this), this.knownSize + that.knownSize)
       case that: Spandex[B] if that.primary.appendElements(this, that.stop) =>
         Spandex.create(that.primary, that.start, that.stop + this.size)
       case that: Spandex[B] if this.primary.prependElements(that, this.start) =>
         Spandex.create(this.primary, this.start - that.size, this.stop)
-      case that: Spandex[B] => Spandex.grow(this, Spandex.capacitate(this.size + that.size)).prependAll(that)
-      case _ => Spandex.fromIterable(xs).concat(this)
+      case that: Spandex[B] =>
+        Spandex.grow(this, Spandex.capacitate(this.size + that.size)).prependAll(that)
+      case that: Iterable[B] if that.knownSize > -1 =>
+        Spandex.fromIterable(View.Concat(that, this), that.knownSize + this.knownSize)
+      case _ if this.isEmpty =>
+        Spandex.fromIterable(xs)
+      case _ =>
+        prependAll1(Spandex.fromIterable(xs))
     }
-
 
   override final def appendAll[B >: A](xs: collection.Iterable[B]): Spandex[B] = appendAll1(xs)
 
   private final def appendAll1[B >: A](xs: collection.IterableOnce[B]): Spandex[B] =
     xs match {
-      case _ if this.isEmpty => Spandex.fromIterable(xs)
-      case that: Iterable[B] if that.knownSize == 0 || that.isEmpty => this
-      case that: Spandex[B] if this.isReversed || that.isReversed => fromIterable(View.Concat(coll, that))
+      case that: Iterable[B] if that.knownSize == 0 || that.isEmpty =>
+        this
+      case that: Iterable[B] if that.knownSize == 1 =>
+        append(that.head)
+      case that: Spandex[B] if this.isReversed || that.isReversed =>
+        Spandex.fromIterable(View.Concat(this, that), this.knownSize + that.knownSize)
       case that: Spandex[B] if that.primary.prependElements(this, that.start) =>
         Spandex.create(that.primary, that.start - this.size, that.stop)
       case that: Spandex[B] if this.primary.appendElements(that, this.stop) =>
         Spandex.create(this.primary, this.start, this.stop + that.size)
-      case that: Spandex[B] => Spandex.grow(this, Spandex.capacitate(this.size + that.size)).appendAll(that)
-      case _ => appendAll(Spandex.fromIterable(xs))
+      case that: Spandex[B] =>
+        Spandex.grow(this, Spandex.capacitate(this.size + that.size)).appendAll(that)
+      case that: Iterable[B] if that.knownSize > -1 =>
+        Spandex.fromIterable(View.Concat(this, that), this.knownSize + that.knownSize)
+      case _ if this.isEmpty =>
+        Spandex.fromIterable(xs)
+      case _ =>
+        appendAll1(Spandex.fromIterable(xs))
     }
 
   override final def map[B](f: A => B): Spandex[B] =
@@ -228,7 +246,7 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       Spandex.tabulate(this.size min that.size) { i =>
         (this.apply(i), that.apply(i))
       }
-    case _ => fromIterable[(A, B)](View.Zip[A, B](coll, xs))
+    case _ => fromIterable[(A, B)](View.Zip[A, B](coll, xs), xs.knownSize)
   }
 
   override def unzip[A1, A2](implicit asPair: <:<[A, (A1, A2)]) = {
@@ -330,8 +348,7 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       array
     }
 
-  override protected[this] final def fromIterable[B](c: collection.Iterable[B]): Spandex[B] =
-    Spandex.fromIterable(c)
+  protected[this] final def fromIterable[B](c: collection.Iterable[B], size: Int = -1): Spandex[B] = Spandex.fromIterable(c, size)
 
   override def iterableFactory: SeqFactory[Spandex] = Spandex
 
@@ -446,8 +463,7 @@ object Spandex extends SeqFactory[Spandex] {
   def apply[A](xs: Spandex[A]): Spandex[A] =
     xs.trim()
 
-  def apply[A](it: Iterable[A]): Spandex[A] =
-    fromIterable(it)
+  def apply[A](it: Iterable[A]): Spandex[A] = Spandex.fromIterable(it)
 
   def apply[A](array: Array[A]): Spandex[A] = {
     if (array.length == 0) Spandex.empty
@@ -474,13 +490,17 @@ object Spandex extends SeqFactory[Spandex] {
 
   private[Spandex] def capacitate(n: Int): Int = (((n max 8) + 7) / 8) * 8
   private[Spandex] def grow[A](xs: Spandex[A], capacity: Int) = {
-    val (frontStartIndex, frontStopIndex) = frontIndexes(xs.start, xs.stop, xs.capacity)
-    val (rearStartIndex, rearStopIndex) = rearIndexes(xs.start, xs.stop)
+    var a = math.min(xs.start, xs.stop)
+    var b = math.max(xs.start, xs.stop)
+    val (frontStartIndex, frontStopIndex) = frontIndexes(a, b, xs.capacity)
+    val (rearStartIndex, rearStopIndex) = rearIndexes(a, b)
     resize(xs, capacity, frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex)
   }
   private[Spandex] def shrink[A](xs: Spandex[A], start: Int, stop: Int) = {
-    val (frontStartIndex, frontStopIndex) = frontIndexes(start, stop, xs.capacity)
-    val (rearStartIndex, rearStopIndex) = rearIndexes(start, stop)
+    var a = math.min(start, stop)
+    var b = math.max(start, stop)
+    val (frontStartIndex, frontStopIndex) = frontIndexes(a, b, xs.capacity)
+    val (rearStartIndex, rearStopIndex) = rearIndexes(a, b)
     resize(xs, capacitate(distance(start, stop)), frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex)
   }
   private[Spandex] def resize[A](xs: Spandex[A], capacity: Int, frontStartIndex: Int, frontStopIndex: Int, rearStartIndex: Int, rearStopIndex: Int) = {
@@ -514,33 +534,26 @@ object Spandex extends SeqFactory[Spandex] {
 
   override def fill[A](n: Int)(elem: => A): Spandex[A] = tabulate(n)(_ => elem)
 
-  def fromIterable[A](it: collection.IterableOnce[A]): Spandex[A] = it match {
-    case c: Iterable[A] => fromIterable(c)
-    case _ =>
-      val builder = Spandex.newBuilder[A]()
-      builder ++= it
-      builder.result()
-  }
+  def fromIterable[A](it: collection.Iterable[A]): Spandex[A] = fromIterable(it, -1)
 
-  def fromIterable[A](it: collection.Iterable[A]): Spandex[A] = it match {
+  def fromIterable[A](it: collection.IterableOnce[A], knownSize: Int = -1): Spandex[A] = it match {
     case that: Spandex[A] ⇒ that
-    case c if c.knownSize == 0 || c.isEmpty => Empty
-    case c if c.knownSize > 0 =>
-      val n = c.knownSize
+    case that: Iterable[A] if knownSize == 0 || that.knownSize == 0 || that.isEmpty => Empty
+    case that: Iterable[A] if knownSize > 0 || that.knownSize > 0 =>
+      val n = math.max(knownSize, that.knownSize)
       val capacity = capacitate(n)
       val array = new Array[Any](capacity)
       var i = 0
-      val it = c.iterator()
+      val it = that.iterator()
       while (i < n) {
         array(i) = it.next()
         i += 1
       }
       create(array, 0, n)
-    case _ ⇒
-      val buffer = ArrayBuffer.fromIterable(it).asInstanceOf[ArrayBuffer[Any]]
-      val capacity = capacitate(buffer.size)
-      val array = new Array[Any](capacity)
-      wrap(buffer.copyToArray(array), buffer.size)
+    case _ =>
+      val builder = Spandex.newBuilder[A]()
+      builder ++= it
+      builder.result()
   }
 
   /**
@@ -549,7 +562,7 @@ object Spandex extends SeqFactory[Spandex] {
     * @param xs array to use for elements
     * @param length the number of elements present in the array (defaults to -1 which will use the array length)
     * @tparam A the element type to use
-    * @return a new instance using the specified array as element storage (or the empty Spandex_Z if the array is empty).
+    * @return a new instance using the specified array as element storage (or the empty Spandex if the array is empty).
     */
   private[strawman] def wrap[A](xs: Array[Any], length: Int = -1): Spandex[A] =
     if (xs.length == 0) Empty
