@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.{Any, AnyRef, Int, Long, Unit}
+import scala.{Any, AnyRef, Int, Long, Unit, math}
 import scala.Predef.{intWrapper, longArrayOps, wrapLongArray, wrapRefArray}
 
 import scala.Predef.{intWrapper, longArrayOps}
@@ -18,7 +18,7 @@ import scala.Predef.{intWrapper, longArrayOps}
 @State(Scope.Benchmark)
 class ScalaArrayBenchmark {
 
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980"/*, "73121", "120000"*/))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980", "73121", "120000"))
   var size: Int = _
 
   var xs: scala.Array[Long] = _
@@ -99,6 +99,33 @@ class ScalaArrayBenchmark {
 
   @Benchmark
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
+
+  @Benchmark
+  def slice_front(bh: Blackhole): Unit = {
+    var i = 0
+    while (i < size) {
+      bh.consume(xs.slice(0, i))
+      i += math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
+  def slice_rear(bh: Blackhole): Unit = {
+    var i = size - 1
+    while (i >= 0) {
+      bh.consume(xs.slice(i, size))
+      i -= math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
+  def slice_middle(bh: Blackhole): Unit = {
+    var i = size / 2
+    while (i >= 0) {
+      bh.consume(xs.slice(i, size - i))
+      i -= math.max(size / 100, 1)
+    }
+  }
 
   @Benchmark
   def loop_foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))

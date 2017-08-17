@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.{Any, AnyRef, Int, Long, Unit}
+import scala.{Any, AnyRef, Int, Long, Unit, math}
 import scala.Predef.intWrapper
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
@@ -16,11 +16,10 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class SpandexBenchmark {
 
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980"/*, "73121", "120000"*/))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980", "73121", "120000"))
   var size: Int = _
 
   var xs: Spandex[Long] = _
-  var zs: Spandex[Long] = _
   var xss: scala.Array[Spandex[Long]] = _
   var zipped: Spandex[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
@@ -31,7 +30,6 @@ class SpandexBenchmark {
   def initData(): Unit = {
     def freshCollection() = Spandex((1 to size).map(_.toLong): _*)
     xs = freshCollection()
-    zs = Spandex.empty
     xss = scala.Array.fill(1000)(freshCollection())
     zipped = xs.map(x => (x, x))
     if (size > 0) {
@@ -99,6 +97,33 @@ class SpandexBenchmark {
 
   @Benchmark
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
+
+  @Benchmark
+  def slice_front(bh: Blackhole): Unit = {
+    var i = 0
+    while (i < size) {
+      bh.consume(xs.slice(0, i))
+      i += math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
+  def slice_rear(bh: Blackhole): Unit = {
+    var i = size - 1
+    while (i >= 0) {
+      bh.consume(xs.slice(i, size))
+      i -= math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
+  def slice_middle(bh: Blackhole): Unit = {
+    var i = size / 2
+    while (i >= 0) {
+      bh.consume(xs.slice(i, size - i))
+      i -= math.max(size / 100, 1)
+    }
+  }
 
   @Benchmark
   def loop_foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
