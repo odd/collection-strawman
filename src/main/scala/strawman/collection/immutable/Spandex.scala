@@ -2,9 +2,9 @@ package strawman
 package collection
 package immutable
 
-import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
+import java.util.concurrent.atomic.AtomicLong
 import scala.{Any, AnyRef, Array, IndexOutOfBoundsException, ArrayIndexOutOfBoundsException, Boolean, Int, Long, NoSuchElementException, UnsupportedOperationException, Nothing, StringContext, Unit, `inline`}
-import scala.Predef.{String, genericWrapArray, intWrapper, <:<}
+import scala.Predef.{String, genericWrapArray, intWrapper, longWrapper, <:<}
 import scala.math
 import scala.math._
 import scala.reflect.ClassTag
@@ -478,7 +478,7 @@ object Spandex extends SeqFactory[Spandex] {
     new Primary[A](array, start, stop)
   private[Spandex] def create[A](primary: Primary[A], start: Int, stop: Int): Spandex[A] = {
     if (start == stop) Spandex.empty
-    else if (isExcessive(primary, start, stop))
+    else if (false && isExcessive(primary, start, stop))
       shrink(primary, start, stop)
     else
       new Secondary[A](primary, start, stop)
@@ -488,7 +488,7 @@ object Spandex extends SeqFactory[Spandex] {
     primary.capacity > 8 && (capacitate(distance(start, stop)) * 100) / primary.capacity <= 25
   }
 
-  private[Spandex] def capacitate(n: Int): Int = (((n max 8) + 7) / 8) * 8
+  private[Spandex] def capacitate(n: Long): Int = ((((n max 8) + 7) / 8) * 8).toInt
   private[Spandex] def grow[A](xs: Spandex[A], capacity: Int) = {
     var a = math.min(xs.start, xs.stop)
     var b = math.max(xs.start, xs.stop)

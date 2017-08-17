@@ -28,7 +28,7 @@ class HashSetBenchmark {
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection() = HashSet((1 to size).map(_.toLong): _*)
+    def freshCollection(n: Int = size) = HashSet((1 to n).map(_.toLong): _*)
     xs = freshCollection()
     xss = scala.Array.fill(1000)(freshCollection())
     zipped = xs.map(x => (x, x))

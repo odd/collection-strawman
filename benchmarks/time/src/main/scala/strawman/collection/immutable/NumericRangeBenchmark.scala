@@ -26,13 +26,13 @@ class NumericRangeBenchmark {
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection() = NumericRange.inclusive(1, size, 1)
+    def freshCollection(n: Int = size) = NumericRange.inclusive(1, n, 1)
     xs = freshCollection()
     xss = scala.Array.fill(1000)(freshCollection())
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
       randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomXss = scala.Array.fill(1000)(freshCollection().take(scala.util.Random.nextInt(size)))
+      randomXss = scala.Array.fill(1000)(freshCollection(scala.util.Random.nextInt(size)))
     }
   }
 

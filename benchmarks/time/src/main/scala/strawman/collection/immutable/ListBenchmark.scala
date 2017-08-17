@@ -28,14 +28,14 @@ class ListBenchmark {
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection() = List((1 to size).map(_.toLong): _*)
+    def freshCollection(n: Int = size) = List((1 to n).map(_.toLong): _*)
     xs = freshCollection()
     xss = scala.Array.fill(1000)(freshCollection())
     zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
       randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomXss = scala.Array.fill(1000)(freshCollection().take(scala.util.Random.nextInt(size)))
+      randomXss = scala.Array.fill(1000)(freshCollection(scala.util.Random.nextInt(size)))
     }
   }
 
