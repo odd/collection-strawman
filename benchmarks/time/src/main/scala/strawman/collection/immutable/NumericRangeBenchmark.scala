@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.{Any, AnyRef, Int, Unit}
+import scala.{Any, AnyRef, Int, Unit, math}
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -19,20 +19,13 @@ class NumericRangeBenchmark {
   var size: Int = _
 
   var xs: NumericRange[Int] = _
-  var xss: scala.Array[NumericRange[Int]] = _
   var randomIndices: scala.Array[Int] = _
-  var randomIndices2: scala.Array[Int] = _
-  var randomXss: scala.Array[NumericRange[Int]] = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection() = NumericRange.inclusive(1, size, 1)
-    xs = freshCollection()
-    xss = scala.Array.fill(1000)(freshCollection())
+    xs = NumericRange.inclusive(1, size, 1)
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomXss = scala.Array.fill(1000)(freshCollection().take(scala.util.Random.nextInt(size)))
     }
   }
 
@@ -49,6 +42,33 @@ class NumericRangeBenchmark {
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
 
   @Benchmark
+  def slice_front(bh: Blackhole): Unit = {
+    var i = 0
+    while (i < size) {
+      bh.consume(xs.slice(0, i))
+      i += math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
+  def slice_rear(bh: Blackhole): Unit = {
+    var i = size - 1
+    while (i >= 0) {
+      bh.consume(xs.slice(i, size))
+      i -= math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
+  def slice_middle(bh: Blackhole): Unit = {
+    var i = size / 2
+    while (i >= 0) {
+      bh.consume(xs.slice(i, size - i))
+      i -= math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
   def loop_foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
 
   @Benchmark
@@ -57,6 +77,15 @@ class NumericRangeBenchmark {
     while (ys.nonEmpty) {
       bh.consume(ys.head)
       ys = ys.tail
+    }
+  }
+
+  @Benchmark
+  def loop_initLast(bh: Blackhole): Unit = {
+    var ys = xs
+    while (ys.nonEmpty) {
+      bh.consume(ys.last)
+      ys = ys.init
     }
   }
 
@@ -76,7 +105,7 @@ class NumericRangeBenchmark {
   def lookup_last(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
-      bh.consume(xss(i)(size - 1))
+      bh.consume(xs(size - 1))
       i += 1
     }
   }
@@ -115,13 +144,14 @@ class NumericRangeBenchmark {
   def map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
 
   @Benchmark
-  @OperationsPerInvocation(1000)
+  @OperationsPerInvocation(100)
   def patch(bh: Blackhole): Unit = {
     var i = 0
-    while (i < 1000) {
+    while (i < 100) {
       val from = randomIndices(i)
-      val replaced = randomIndices2(i)
-      bh.consume(xs.patch(from, randomXss(i), replaced))
+      val replaced = randomIndices(if (i > 0) i - 1 else math.min(i + 1, size - 1))
+      val length = randomIndices(if (i > 1) i - 2 else math.min(i + 2, size - 1))
+      bh.consume(xs.patch(from, xs.take(length), replaced))
       i += 1
     }
   }

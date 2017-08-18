@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.{Any, AnyRef, Int, Long, Unit}
+import scala.{Any, AnyRef, Int, Long, Unit, math}
 import scala.Predef.intWrapper
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
@@ -20,22 +20,15 @@ class ScalaHashSetBenchmark {
   var size: Int = _
 
   var xs: scala.collection.immutable.HashSet[Long] = _
-  var xss: scala.Array[scala.collection.immutable.HashSet[Long]] = _
   var zipped: scala.collection.immutable.HashSet[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
-  var randomIndices2: scala.Array[Int] = _
-  var randomXss: scala.Array[scala.collection.immutable.HashSet[Long]] = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection() = scala.collection.immutable.HashSet((1 to size).map(_.toLong): _*)
-    xs = freshCollection()
-    xss = scala.Array.fill(1000)(freshCollection())
+    xs = scala.collection.immutable.HashSet((1 to size).map(_.toLong): _*)
     zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomXss = scala.Array.fill(1000)(freshCollection().take(scala.util.Random.nextInt(size)))
     }
   }
 
@@ -58,6 +51,33 @@ class ScalaHashSetBenchmark {
 
   @Benchmark
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
+
+  @Benchmark
+  def slice_front(bh: Blackhole): Unit = {
+    var i = 0
+    while (i < size) {
+      bh.consume(xs.slice(0, i))
+      i += math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
+  def slice_rear(bh: Blackhole): Unit = {
+    var i = size - 1
+    while (i >= 0) {
+      bh.consume(xs.slice(i, size))
+      i -= math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
+  def slice_middle(bh: Blackhole): Unit = {
+    var i = size / 2
+    while (i >= 0) {
+      bh.consume(xs.slice(i, size - i))
+      i -= math.max(size / 100, 1)
+    }
+  }
 
   @Benchmark
   def loop_foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
@@ -93,7 +113,7 @@ class ScalaHashSetBenchmark {
   def contains(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
-      bh.consume(xss(i).contains(i))
+      bh.consume(xs.contains(i))
       i += 1
     }
   }

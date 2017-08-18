@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.{Any, AnyRef, Int, Long, Unit}
+import scala.{Any, AnyRef, Int, Long, Unit, math}
 import scala.Predef.intWrapper
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
@@ -20,22 +20,15 @@ class ArrayBufferBenchmark {
   var size: Int = _
 
   var xs: ArrayBuffer[Long] = _
-  var xss: scala.Array[ArrayBuffer[Long]] = _
   var zipped: ArrayBuffer[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
-  var randomIndices2: scala.Array[Int] = _
-  var randomXss: scala.Array[ArrayBuffer[Long]] = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection() = ArrayBuffer((1 to size).map(_.toLong): _*)
-    xs = freshCollection()
-    xss = scala.Array.fill(1000)(freshCollection())
+    xs = ArrayBuffer((1 to size).map(_.toLong): _*)
     zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomXss = scala.Array.fill(1000)(freshCollection().take(scala.util.Random.nextInt(size)))
     }
   }
 
@@ -82,7 +75,7 @@ class ArrayBufferBenchmark {
   @Benchmark
   def prependAllAppendAll(bh: Blackhole): Unit = {
     var ys = ArrayBuffer.empty[Long]
-    val ys2 = xss(0).take(3)
+    val ys2 = xs.take(3)
     var i = 0L
     while (i < size) {
       if ((i & 1) == 1) ys.addAll(ys2)
@@ -97,6 +90,33 @@ class ArrayBufferBenchmark {
 
   @Benchmark
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
+
+  @Benchmark
+  def slice_front(bh: Blackhole): Unit = {
+    var i = 0
+    while (i < size) {
+      bh.consume(xs.slice(0, i))
+      i += math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
+  def slice_rear(bh: Blackhole): Unit = {
+    var i = size - 1
+    while (i >= 0) {
+      bh.consume(xs.slice(i, size))
+      i -= math.max(size / 100, 1)
+    }
+  }
+
+  @Benchmark
+  def slice_middle(bh: Blackhole): Unit = {
+    var i = size / 2
+    while (i >= 0) {
+      bh.consume(xs.slice(i, size - i))
+      i -= math.max(size / 100, 1)
+    }
+  }
 
   @Benchmark
   def loop_foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
@@ -135,7 +155,7 @@ class ArrayBufferBenchmark {
   def lookup_last(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
-      bh.consume(xss(i)(size - 1))
+      bh.consume(xs(size - 1))
       i += 1
     }
   }
@@ -174,13 +194,14 @@ class ArrayBufferBenchmark {
   def map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
 
   @Benchmark
-  @OperationsPerInvocation(1000)
+  @OperationsPerInvocation(100)
   def patch(bh: Blackhole): Unit = {
     var i = 0
-    while (i < 1000) {
+    while (i < 100) {
       val from = randomIndices(i)
-      val replaced = randomIndices2(i)
-      bh.consume(xs.patchInPlace(from, randomXss(i), replaced))
+      val replaced = randomIndices(if (i > 0) i - 1 else math.min(i + 1, size - 1))
+      val length = randomIndices(if (i > 1) i - 2 else math.min(i + 2, size - 1))
+      bh.consume(xs.patchInPlace(from, xs.take(length), replaced))
       i += 1
     }
   }
