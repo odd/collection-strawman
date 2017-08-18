@@ -12,8 +12,9 @@ import scala.util.hashing.MurmurHash3
 
 /** Base trait for sequence collections */
 trait Seq[+A] extends Iterable[A] with SeqOps[A, Seq, Seq[A]] {
-  protected[this] def c: this.type = this
-  protected[this] def seq: this.type = this
+  final protected[this] def coll: this.type = this
+  final def toSeq: this.type = this
+  def iterableFactory: SeqFactory[Seq]
 }
 
 /** Base trait for Seq operations */
@@ -22,17 +23,16 @@ trait SeqOps[+A, +CC[X], +C] extends Any
   with ArrayLike[A]
   with Equals {
 
-  protected[this] def c: C
-  protected[this] def seq: Seq[A]
-
-  // Refine the factory member to be a `SeqFactory`
-  def iterableFactory: SeqFactory[CC]
+  /**
+    * @return This collection as a `Seq[A]`. This is equivalent to `to(Seq)` but might be faster.
+    */
+  def toSeq: Seq[A]
 
   /** Selects all the elements of this $coll ignoring the duplicates.
     *
     * @return a new $coll consisting of all the elements of this $coll without duplicates.
     */
-  def distinct: C = fromSpecificIterable(new View.Distinct(coll))
+  def distinct: C = fromSpecificIterable(new View.Distinct(toIterable))
 
   /** Returns new $coll with elements in reversed order.
    *
@@ -63,7 +63,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     *         index `offset`, otherwise `false`.
     */
   def startsWith[B >: A](that: Seq[B], offset: Int = 0): Boolean = {
-    val i = coll.iterator() drop offset
+    val i = toIterable.iterator() drop offset
     val j = that.iterator()
     while (j.hasNext && i.hasNext)
       if (i.next() != j.next())
@@ -78,7 +78,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     *  @return `true` if this $coll has `that` as a suffix, `false` otherwise.
     */
   def endsWith[B >: A](that: Seq[B]): Boolean = {
-    val i = coll.iterator().drop(length - that.length)
+    val i = toIterable.iterator().drop(length - that.length)
     val j = that.iterator()
     while (i.hasNext && j.hasNext)
       if (i.next() != j.next())
@@ -96,7 +96,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
    *          all elements of this $coll followed by the minimal number of occurrences of `elem` so
    *          that the resulting collection has a length of at least `len`.
    */
-  def padTo[B >: A](len: Int, elem: B): CC[B] = fromIterable(View.PadTo(coll, len, elem))
+  def padTo[B >: A](len: Int, elem: B): CC[B] = fromIterable(View.PadTo(toIterable, len, elem))
 
   /** Finds index of the first element satisfying some predicate after or at some start index.
     *
@@ -107,7 +107,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     *  @return  the index `>= from` of the first element of this $coll that satisfies the predicate `p`,
     *           or `-1`, if none exists.
     */
-  def indexWhere(p: A => Boolean, from: Int = 0): Int = coll.iterator().indexWhere(p, from)
+  def indexWhere(p: A => Boolean, from: Int = 0): Int = toIterable.iterator().indexWhere(p, from)
 
   /** Finds index of first occurrence of some value in this $coll after or at some start index.
     *
@@ -149,6 +149,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
    *  @return  the first index `>= from` such that the elements of this $coll starting at this index
    *           match the elements of sequence `that`, or `-1` of no such subsequence exists.
    */
+  // TODO Should be implemented in a way that preserves laziness
   def indexOfSlice[B >: A](that: Seq[B], from: Int = 0): Int =
     if (this.knownSize >= 0 && that.knownSize >= 0) {
       val l = length
@@ -157,11 +158,11 @@ trait SeqOps[+A, +CC[X], +C] extends Any
       if (from > l) -1
       else if (tl < 1) clippedFrom
       else if (l < tl) -1
-      else SeqOps.kmpSearch(seq, clippedFrom, l, that, 0, tl, forward = true)
+      else SeqOps.kmpSearch(toSeq, clippedFrom, l, that, 0, tl, forward = true)
     }
     else {
       var i = from
-      var s: Seq[A] = seq drop i
+      var s: Seq[A] = toSeq drop i
       while (!s.isEmpty) {
         if (s startsWith that)
           return i
@@ -186,7 +187,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     if (end < 0) -1
     else if (tl < 1) clippedL
     else if (l < tl) -1
-    else SeqOps.kmpSearch(seq, 0, clippedL+tl, that, 0, tl, forward = false)
+    else SeqOps.kmpSearch(toSeq, 0, clippedL+tl, that, 0, tl, forward = false)
   }
 
   /** Tests whether this $coll contains a given sequence as a slice.
@@ -212,7 +213,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     *  @example  `"abb".permutations = Iterator(abb, bab, bba)`
     */
   def permutations: Iterator[C] =
-    if (isEmpty) Iterator(c)
+    if (isEmpty) Iterator(coll)
     else new PermutationsItr
 
   /** Iterates over combinations.  A _combination_ of length `n` is a subsequence of
@@ -275,7 +276,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
 
     private[this] def init() = {
       val m = mutable.HashMap[A, Int]()
-      val (es, is) = (seq map (e => (e, m.getOrElseUpdate(e, m.size))) sortBy (_._2)).unzip
+      val (es, is) = (toSeq map (e => (e, m.getOrElseUpdate(e, m.size))) sortBy (_._2)).unzip
 
       (es.to(mutable.ArrayBuffer), is.toArray)
     }
@@ -336,7 +337,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
       val m = mutable.HashMap[A, Int]()
 
       // e => (e, weight(e))
-      val (es, is) = (seq map (e => (e, m.getOrElseUpdate(e, m.size))) sortBy (_._2)).unzip
+      val (es, is) = (toSeq map (e => (e, m.getOrElseUpdate(e, m.size))) sortBy (_._2)).unzip
       val cs = new Array[Int](m.size)
       is foreach (i => cs(i) += 1)
       val ns = new Array[Int](cs.length)
@@ -364,7 +365,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
   def sorted[B >: A](implicit ord: Ordering[B]): C = {
     val len = this.length
     val b = newSpecificBuilder()
-    if (len == 1) b ++= coll
+    if (len == 1) b ++= toIterable
     else if (len > 1) {
       b.sizeHint(len)
       val arr = new Array[AnyRef](len)  // Previously used ArraySeq for more compact but slower code
@@ -433,7 +434,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     * as those of `that`?
     */
   def sameElements[B >: A](that: IterableOnce[B]): Boolean =
-    coll.iterator().sameElements(that)
+    toIterable.iterator().sameElements(that)
 
   /** Method called from equality methods, so that user-defined subclasses can
     *  refuse to be equal to other collections of the same kind.
@@ -449,7 +450,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
       case _ => false
     }
 
-  override def hashCode(): Int = stableIterableHash(coll)
+  override def hashCode(): Int = stableIterableHash(toIterable)
 
   // Temporary: TODO move to MurmurHash3.scala
   private def stableIterableHash(xs: Iterable[_]): Int = {

@@ -17,7 +17,7 @@ trait StrictOptimizedSeqOps[+A, +CC[_], +C]
       b.sizeHint(size + 1)
     }
     b += elem
-    b ++= coll
+    b ++= toIterable
     b.result()
   }
 
@@ -26,7 +26,7 @@ trait StrictOptimizedSeqOps[+A, +CC[_], +C]
     if (knownSize >= 0) {
       b.sizeHint(size + 1)
     }
-    b ++= coll
+    b ++= toIterable
     b += elem
     b.result()
   }
@@ -38,7 +38,7 @@ trait StrictOptimizedSeqOps[+A, +CC[_], +C]
       b.sizeHint(size)
     }
     var i = 0
-    val it = coll.iterator()
+    val it = toIterable.iterator()
     while (i < index && it.hasNext) {
       b += it.next()
       i += 1
@@ -53,7 +53,7 @@ trait StrictOptimizedSeqOps[+A, +CC[_], +C]
   override def patch[B >: A](from: Int, other: IterableOnce[B], replaced: Int): CC[B] = {
     val b = iterableFactory.newBuilder[B]()
     var i = 0
-    val it = coll.iterator()
+    val it = toIterable.iterator()
     while (i < from && it.hasNext) {
       b += it.next()
       i += 1

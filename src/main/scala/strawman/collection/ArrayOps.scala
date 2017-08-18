@@ -14,9 +14,9 @@ class ArrayOps[A](val xs: Array[A])
     with StrictOptimizedIterableOps[A, Seq, Array[A]]
     with ArrayLike[A] {
 
-  protected[this] def coll = ArrayView(xs)
-  protected[this] def c: Array[A] = xs
-  protected[this] def seq: Seq[A] = iterableFactory.fromIterable(coll)
+  def toIterable = ArrayView(xs)
+  protected[this] def coll: Array[A] = xs
+  def toSeq: Seq[A] = fromIterable(toIterable)
 
   def length = xs.length
   @throws[ArrayIndexOutOfBoundsException]
@@ -37,11 +37,25 @@ class ArrayOps[A](val xs: Array[A])
 
   override def className = "Array"
 
-  def iterator(): Iterator[A] = coll.iterator()
-  def map[B: ClassTag](f: A => B): Array[B] = fromTaggedIterable(View.Map(coll, f))
-  def flatMap[B: ClassTag](f: A => IterableOnce[B]): Array[B] = fromTaggedIterable(View.FlatMap(coll, f))
-  def ++[B >: A : ClassTag](xs: Iterable[B]): Array[B] = fromTaggedIterable(View.Concat(coll, xs))
-  def zip[B: ClassTag](xs: Iterable[B]): Array[(A, B)] = fromTaggedIterable(View.Zip(coll, xs))
+  def iterator(): Iterator[A] = toIterable.iterator()
+
+  def map[B: ClassTag](f: A => B): Array[B] = fromTaggedIterable(View.Map(toIterable, f))
+
+  def mapInPlace(f: A => A): Array[A] = {
+    var i = 0
+    while (i < xs.length) {
+      xs.update(i, f(xs(i)))
+      i = i + 1
+    }
+    xs
+  }
+
+  def flatMap[B: ClassTag](f: A => IterableOnce[B]): Array[B] = fromTaggedIterable(View.FlatMap(toIterable, f))
+
+  def ++[B >: A : ClassTag](xs: Iterable[B]): Array[B] = fromTaggedIterable(View.Concat(toIterable, xs))
+
+  def zip[B: ClassTag](xs: Iterable[B]): Array[(A, B)] = fromTaggedIterable(View.Zip(toIterable, xs))
+
 }
 
 case class ArrayView[A](xs: Array[A]) extends IndexedView[A] {
