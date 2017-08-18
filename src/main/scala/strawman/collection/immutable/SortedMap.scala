@@ -9,11 +9,11 @@ trait SortedMap[K, +V]
      with collection.SortedMap[K, V]
      with SortedMapOps[K, V, SortedMap, SortedMap[K, V]]
 
-trait SortedMapOps[K, +V, +CC[X, +Y] <: SortedMap[X, Y] with SortedMapOps[X, Y, CC, _], +C <: CC[K, V]]
+trait SortedMapOps[K, +V, +CC[X, +Y] <: Map[X, Y] with SortedMapOps[X, Y, CC, _], +C <: SortedMapOps[K, V, CC, C]]
   extends MapOps[K, V, Map, C]
      with collection.SortedMapOps[K, V, CC, C] {
 
-    protected[this] def coll: C
+    protected[this] def coll: C with CC[K, V]
 
     protected def mapFromIterable[K2, V2](it: collection.Iterable[(K2, V2)]): Map[K2, V2] =
       Map.fromIterable(it)

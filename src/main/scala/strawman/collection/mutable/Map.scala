@@ -8,17 +8,15 @@ import scala.{Boolean, None, Option, Some, Unit, `inline`}
 
 /** Base type of mutable Maps */
 trait Map[K, V]
-  extends GrowableIterable[(K, V)]
+  extends Iterable[(K, V)]
     with collection.Map[K, V]
     with MapOps[K, V, Map, Map[K, V]]
-    with Shrinkable[K]
 
 /** Base trait of mutable Maps implementations */
-trait MapOps[K, V, +CC[X, Y] <: Map[X, Y], +C <: Map[K, V]]
+trait MapOps[K, V, +CC[X, Y] <: MapOps[X, Y, CC, _], +C <: MapOps[K, V, CC, C]]
   extends IterableOps[(K, V), Iterable, C]
-    with collection.MapOps[K, V, CC, C] {
-
-  protected[this] def coll: Map[K, V]
+    with collection.MapOps[K, V, CC, C]
+    with Shrinkable[K] {
 
   def iterableFactory = Iterable
 
@@ -67,7 +65,7 @@ trait MapOps[K, V, +CC[X, Y] <: Map[X, Y], +C <: Map[K, V]]
       case None => val d = op; this(key) = d; d
     }
 
-  override def clone(): C = empty ++= coll
+  override def clone(): C = empty ++= toIterable
 
   def mapInPlace(f: ((K, V)) => (K, V)): this.type = {
     val toAdd = Map[K, V]()

@@ -16,6 +16,8 @@ trait View[+A] extends Iterable[A] with IterableOps[A, View, View[A]] {
   protected[this] def newSpecificBuilder(): Builder[A, View[A]] =
     immutable.IndexedSeq.newBuilder().mapResult(_.view)
 
+  final protected[this] def coll: this.type = this
+
   override def toString = "View(?)"
 
   override def className = "View"
@@ -264,7 +266,19 @@ trait ArrayLike[+A] extends Any {
 }
 
 /** View defined in terms of indexing a range */
-trait IndexedView[+A] extends View[A] with ArrayLike[A] { self =>
+trait IndexedView[+A] extends View[A] with ArrayLike[A] with SeqOps[A, View, IndexedView[A]] { self =>
+
+  final def toSeq: Seq[A] = to(IndexedSeq)
+
+  override protected[this] def fromSpecificIterable(it: Iterable[A]): IndexedView[A] =
+    it match {
+      case v: IndexedView[A] => v
+      case i: IndexedSeq[A] => i.view
+      case _ => it.to(IndexedSeq).view
+    }
+
+  override protected[this] def newSpecificBuilder(): Builder[A, IndexedView[A]] =
+    IndexedSeq.newBuilder[A]().mapResult(_.view)
 
   def iterator(): Iterator[A] = new Iterator[A] {
     private var current = 0
@@ -283,14 +297,13 @@ trait IndexedView[+A] extends View[A] with ArrayLike[A] { self =>
   override def drop(n: Int): IndexedView[A] = new IndexedView.Drop(this, n)
   override def dropRight(n: Int): IndexedView[A] = new IndexedView.DropRight(this, n)
   override def map[B](f: A => B): IndexedView[B] = new IndexedView.Map(this, f)
-  def reverse: IndexedView[A] = IndexedView.Reverse(this)
+  override def reverse: IndexedView[A] = IndexedView.Reverse(this)
 }
 
 object IndexedView {
 
-  class Take[A](underlying: IndexedView[A], n: Int)
-  extends View.Take(underlying, n) with IndexedView[A] {
-    override def iterator() = super.iterator() // needed to avoid "conflicting overrides" error
+  class Take[A](underlying: IndexedView[A], n: Int) extends IndexedView[A] {
+    private[this] val normN = n max 0
     def length = underlying.length min normN
     @throws[IndexOutOfBoundsException]
     def apply(i: Int) = underlying.apply(i)
@@ -303,9 +316,8 @@ object IndexedView {
     def apply(i: Int) = underlying.apply(i + delta)
   }
 
-  class Drop[A](underlying: IndexedView[A], n: Int)
-  extends View.Drop(underlying, n) with IndexedView[A] {
-    override def iterator() = super.iterator()
+  class Drop[A](underlying: IndexedView[A], n: Int) extends IndexedView[A] {
+    protected val normN = n max 0
     def length = (underlying.length - normN) max 0
     @throws[IndexOutOfBoundsException]
     def apply(i: Int) = underlying.apply(i + normN)

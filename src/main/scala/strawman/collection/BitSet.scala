@@ -12,8 +12,6 @@ trait BitSetOps[+C <: BitSet with BitSetOps[C]]
   extends SortedSetOps[Int, SortedSet, C] {
   import BitSetOps._
 
-  protected[this] def coll: C
-
   final def ordering: Ordering[Int] = Ordering.Int
 
   /** The number of words (each with 64 bits) making up the set */
@@ -137,9 +135,9 @@ trait BitSetOps[+C <: BitSet with BitSetOps[C]]
     * @return a new bitset resulting from applying the given function ''f'' to
     *         each element of this bitset and collecting the results
     */
-  def map(f: Int => Int): C = fromSpecificIterable(View.Map(coll, f))
+  def map(f: Int => Int): C = fromSpecificIterable(View.Map(toIterable, f))
 
-  def flatMap(f: Int => IterableOnce[Int]): C = fromSpecificIterable(View.FlatMap(coll, f))
+  def flatMap(f: Int => IterableOnce[Int]): C = fromSpecificIterable(View.FlatMap(toIterable, f))
 
 }
 
