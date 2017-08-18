@@ -15,24 +15,17 @@ import scala.{Any, AnyRef, Int, Unit, math}
 @State(Scope.Benchmark)
 class NumericRangeBenchmark {
 
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980", "73121", "120000"))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980", "73121", "140000"))
   var size: Int = _
 
   var xs: NumericRange[Int] = _
-  var xss: scala.Array[NumericRange[Int]] = _
   var randomIndices: scala.Array[Int] = _
-  var randomIndices2: scala.Array[Int] = _
-  var randomXss: scala.Array[NumericRange[Int]] = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection(n: Int = size) = NumericRange.inclusive(1, n, 1)
-    xs = freshCollection()
-    xss = scala.Array.fill(1000)(freshCollection())
+    xs = NumericRange.inclusive(1, size, 1)
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomXss = scala.Array.fill(1000)(freshCollection(scala.util.Random.nextInt(size)))
     }
   }
 
@@ -88,6 +81,15 @@ class NumericRangeBenchmark {
   }
 
   @Benchmark
+  def loop_initLast(bh: Blackhole): Unit = {
+    var ys = xs
+    while (ys.nonEmpty) {
+      bh.consume(ys.last)
+      ys = ys.init
+    }
+  }
+
+  @Benchmark
   def loop_iterator(bh: Blackhole): Unit = {
     val it = xs.iterator()
     while (it.hasNext) {
@@ -103,7 +105,7 @@ class NumericRangeBenchmark {
   def lookup_last(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
-      bh.consume(xss(i)(size - 1))
+      bh.consume(xs(size - 1))
       i += 1
     }
   }
@@ -142,13 +144,14 @@ class NumericRangeBenchmark {
   def map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
 
   @Benchmark
-  @OperationsPerInvocation(1000)
+  @OperationsPerInvocation(100)
   def patch(bh: Blackhole): Unit = {
     var i = 0
-    while (i < 1000) {
+    while (i < 100) {
       val from = randomIndices(i)
-      val replaced = randomIndices2(i)
-      bh.consume(xs.patch(from, randomXss(i), replaced))
+      val replaced = randomIndices(if (i > 0) i - 1 else math.min(i + 1, size))
+      val length = randomIndices(if (i > 1) i - 2 else math.min(i + 2, size))
+      bh.consume(xs.patch(from, xs.take(length), replaced))
       i += 1
     }
   }

@@ -3,7 +3,7 @@ package collection
 package immutable
 
 import java.util.concurrent.atomic.AtomicLong
-import scala.{Any, AnyRef, Array, IndexOutOfBoundsException, ArrayIndexOutOfBoundsException, Boolean, Int, Long, NoSuchElementException, UnsupportedOperationException, Nothing, StringContext, Unit, `inline`}
+import scala.{Any, AnyRef, Array, IllegalArgumentException, IndexOutOfBoundsException, ArrayIndexOutOfBoundsException, Boolean, Int, Long, NoSuchElementException, UnsupportedOperationException, Nothing, StringContext, Unit, `inline`}
 import scala.Predef.{String, genericWrapArray, intWrapper, longWrapper, <:<}
 import scala.math
 import scala.math._
@@ -32,7 +32,7 @@ import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
   * <br/>
   * <br/>
   * The smallest array size is eight and when the underlying array is too small to fit a requested addition a new array twice as large is
-  * allocated. If after an operation the size of the result is smaller than or equal to 25% of the size of its primary
+  * allocated. If after an operation the size of the result is smaller than or equal the shrink threshold percentage of the size of its primary (defaults to 25%),
   * a new primary is created (using an array with a capacity suitable to the size of the result).
   * <br/>
   * <br/>
@@ -93,6 +93,26 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
   @`inline`
   private[this] final def fetch(i: Int): A = element(position(i))
 
+  /**
+    * The maximum <code>size / capacity</code> percentage threshold allowed before auto shrinking.
+    * A value <code>&lt;= 0</code> means no auto shrinking will take place, a value <code>&gt;= 100</code> means all returned collections will be auto
+    * shrunk (to their closest matching capacity).
+    */
+  def shrinkThreshold: Int = Spandex.DefaultAutoShrinkThreshold
+
+  /**
+    * Returns a <code>Spandex</code> that uses the specified auto shrinking percentage threshold.
+    * @param threshold the maximum <code>size / capacity</code> percentage (defaults to <code>DefaultAutoShrinkingThreshold</code>).
+    */
+  def withAutoShrinking(threshold: Int = Spandex.DefaultAutoShrinkThreshold): Spandex[A] =
+    if (threshold == Spandex.DefaultAutoShrinkThreshold) this
+    else Spandex.createSecondary(this, start, stop, threshold)
+
+  /**
+    * Returns a <code>Spandex</code> that uses no auto shrinking (has an auto shrinking percentage threshold of <code>0</code>).
+    */
+  def withoutAutoShrinking: Spandex[A] = withAutoShrinking(0)
+
   override final def length = size
 
   override final def size: Int = Spandex.distance(start, stop)
@@ -112,8 +132,8 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
     else {
       val f = (from max 0) max 0
       val u = (until min size) max 0
-      if (isReversed) Spandex.create(primary, start - f, start - u)
-      else Spandex.create(primary, start + f, start + u)
+      if (isReversed) Spandex.createSecondary(primary, start - f, start - u, shrinkThreshold)
+      else Spandex.createSecondary(primary, start + f, start + u, shrinkThreshold)
     }
 
   override final def take(n: Int): Spandex[A] =
@@ -152,31 +172,20 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
     if (isEmpty) throw new UnsupportedOperationException
     else dropRight(1)
 
-  final def trim(): Spandex[A] =
-    if (size == 0) Spandex.Empty
-    else if (size == capacity) this
-    else {
-      var a = math.min(start, stop)
-      var b = math.max(start, stop)
-      val (frontStartIndex, frontStopIndex) = Spandex.frontIndexes(a, b, size)
-      val (rearStartIndex, rearStopIndex) = Spandex.rearIndexes(a, b)
-      Spandex.resize(this, size, frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex)
-   }
-
   override def padTo[B >: A](len: Int, elem: B): Spandex[B] =
     if (len <= size) this
     else appendAll1(Iterator.continually(elem).take(len - size))
 
   override final def prepend[B >: A](elem: B): Spandex[B] =
     if (isEmpty) Spandex(elem)
-    else if (nonReversed && primary.prependElement(elem, start)) Spandex.create(primary, start - 1, stop)
-    else if (isReversed && primary.appendElement(elem, start)) Spandex.create(primary, start + 1, stop)
+    else if (nonReversed && primary.prependElement(elem, start)) Spandex.createSecondary(primary, start - 1, stop, shrinkThreshold)
+    else if (isReversed && primary.appendElement(elem, start)) Spandex.createSecondary(primary, start + 1, stop, shrinkThreshold) // as it is reversed start is really stop and stop is really start
     else elem +: Spandex.grow(this, Spandex.capacitate((size - 1) * 2))
 
   override final def append[B >: A](elem: B): Spandex[B] =
     if (isEmpty) Spandex(elem)
-    else if (nonReversed && primary.appendElement(elem, stop)) Spandex.create(primary, start, stop + 1)
-    else if (isReversed && primary.prependElement(elem, stop)) Spandex.create(primary, start, stop - 1)
+    else if (nonReversed && primary.appendElement(elem, stop)) Spandex.createSecondary(primary, start, stop + 1, shrinkThreshold)
+    else if (isReversed && primary.prependElement(elem, stop)) Spandex.createSecondary(primary, start, stop - 1, shrinkThreshold)  // as it is reversed start is really stop and stop is really start
     else Spandex.grow(this, Spandex.capacitate((size - 1) * 2)) :+ elem
 
   override final def prependAll[B >: A](xs: collection.Iterable[B]): Spandex[B] = prependAll1(xs)
@@ -190,9 +199,9 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       case that: Spandex[B] if this.isReversed || that.isReversed =>
         Spandex.fromIterable(View.Concat(that, this), this.knownSize + that.knownSize)
       case that: Spandex[B] if that.primary.appendElements(this, that.stop) =>
-        Spandex.create(that.primary, that.start, that.stop + this.size)
+        Spandex.createSecondary(that.primary, that.start, that.stop + this.size, shrinkThreshold)
       case that: Spandex[B] if this.primary.prependElements(that, this.start) =>
-        Spandex.create(this.primary, this.start - that.size, this.stop)
+        Spandex.createSecondary(this.primary, this.start - that.size, this.stop, shrinkThreshold)
       case that: Spandex[B] =>
         Spandex.grow(this, Spandex.capacitate(this.size + that.size)).prependAll(that)
       case that: Iterable[B] if that.knownSize > -1 =>
@@ -214,9 +223,9 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       case that: Spandex[B] if this.isReversed || that.isReversed =>
         Spandex.fromIterable(View.Concat(this, that), this.knownSize + that.knownSize)
       case that: Spandex[B] if that.primary.prependElements(this, that.start) =>
-        Spandex.create(that.primary, that.start - this.size, that.stop)
+        Spandex.createSecondary(that.primary, that.start - this.size, that.stop, shrinkThreshold)
       case that: Spandex[B] if this.primary.appendElements(that, this.stop) =>
-        Spandex.create(this.primary, this.start, this.stop + that.size)
+        Spandex.createSecondary(this.primary, this.start, this.stop + that.size, shrinkThreshold)
       case that: Spandex[B] =>
         Spandex.grow(this, Spandex.capacitate(this.size + that.size)).appendAll(that)
       case that: Iterable[B] if that.knownSize > -1 =>
@@ -238,7 +247,7 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
         array(j) = f(element(j))
         i -= 1
       }
-      new Spandex.Primary[B](array, start, stop)
+      Spandex.createPrimary[B](array, start, stop).withAutoShrinking(shrinkThreshold)
     }
 
   override final def zip[B](xs: collection.Iterable[B]): Spandex[(A, B)] = xs match {
@@ -246,10 +255,11 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       Spandex.tabulate(this.size min that.size) { i =>
         (this.apply(i), that.apply(i))
       }
-    case _ => fromIterable[(A, B)](View.Zip[A, B](coll, xs), xs.knownSize)
+    case _ =>
+      fromIterable[(A, B)](View.Zip[A, B](coll, xs), xs.knownSize)
   }
 
-  override def unzip[A1, A2](implicit asPair: <:<[A, (A1, A2)]) = {
+  override def unzip[A1, A2](implicit asPair: <:<[A, (A1, A2)]): (Spandex[A1], Spandex[A2]) = {
     val arr1 = new Array[Any](capacity)
     val arr2 = new Array[Any](capacity)
     var i = 0
@@ -260,7 +270,7 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       arr2(i) = a2
       i += 1
     }
-    (Spandex.create(arr1, 0, sz), Spandex.create(arr2, 0, sz))
+    (Spandex.createPrimary(arr1, 0, sz).withAutoShrinking(shrinkThreshold), Spandex.createPrimary(arr2, 0, sz).withAutoShrinking(shrinkThreshold))
   }
 
   override final def iterator(): Iterator[A] =
@@ -286,9 +296,13 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
     }
 
   override final def reverse: Spandex[A] =
-    if (isEmpty) Spandex.empty
+    if (isEmpty) Spandex.empty.withAutoShrinking(shrinkThreshold)
     else if (size == 1) this
-    else Spandex.create(primary, stop, start)
+    else Spandex.createSecondary(primary, stop, start, shrinkThreshold)
+
+  private[Spandex] final def withReversed(reversed: Boolean): Spandex[A] =
+    if (!reversed) this
+    else reverse
 
   override protected[this] def reversed: Spandex[A] = reverse
 
@@ -319,7 +333,7 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       val array = new Array[Any](capacity)
       java.lang.System.arraycopy(elements, 0, array, 0, capacity)
       array.update(position(i), elem)
-      Spandex.create(array, start, stop)
+      Spandex.createPrimary(array, start, stop).withAutoShrinking(shrinkThreshold)
     }
   }
 
@@ -339,13 +353,27 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
       throw new ArrayIndexOutOfBoundsException(start)
     else if (isReversed) super.copyToArray(array, start)
     else {
-      val (frontStartIndex, frontStopIndex) = Spandex.frontIndexes(start, size, size)
-      val (rearStartIndex, rearStopIndex) = Spandex.rearIndexes(start, size)
+      val (frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex) = Spandex.indices(start, size, size)
       if (frontStopIndex > 0)
         java.lang.System.arraycopy(elements, frontStartIndex, array, 0, frontStopIndex - frontStartIndex)
       if (rearStopIndex > 0)
         java.lang.System.arraycopy(elements, rearStartIndex, array, frontStopIndex - frontStartIndex, rearStopIndex - rearStartIndex)
       array
+    }
+
+  final def grow(size: Int, padded: Boolean = true): Spandex[A] = resize(size, padded)
+
+  final def shrink(padded: Boolean = true): Spandex[A] = resize(this.size, padded)
+
+  final def trim(): Spandex[A] = shrink(false)
+
+  final def resize(size: Int, padded: Boolean = true): Spandex[A] =
+    if (size == 0) Spandex.Empty
+    else if (size == capacity) this
+    else if (size < this.size) throw new IllegalArgumentException(s"Specified size of $size is smaller than the current size ${this.size}.")
+    else {
+      val (frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex) = Spandex.indices(start min stop, start max stop, this.size)
+      Spandex.resize(this, if (padded) Spandex.capacitate(size) else size, frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex)
     }
 
   protected[this] final def fromIterable[B](c: collection.Iterable[B], size: Int = -1): Spandex[B] = Spandex.fromIterable(c, size)
@@ -360,6 +388,11 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
 }
 
 object Spandex extends SeqFactory[Spandex] {
+  /**
+    * The default maximum <code>size / capacity</code> percentage threshold allowed before auto shrinking is <code>25</code>.
+    */
+  final val DefaultAutoShrinkThreshold = 25
+
   private[immutable] class Primary[+A](
     override val elements: scala.Array[Any],
     x: Int,
@@ -396,8 +429,7 @@ object Spandex extends SeqFactory[Spandex] {
       val lowered = low - that.size
       if (Spandex.distance(lowered, high) > capacity) false
       else if (low == start && lowered >= -capacity && bounds.compareAndSet(bnds, pack(lowered, high))) {
-        val (sourceFrontStartIndex, sourceFrontStopIndex) = Spandex.frontIndexes(that.start, that.stop, that.capacity)
-        val (sourceRearStartIndex, sourceRearStopIndex) = Spandex.rearIndexes(that.start, that.stop)
+        val (sourceFrontStartIndex, sourceFrontStopIndex, sourceRearStartIndex, sourceRearStopIndex) = Spandex.indices(that.start, that.stop, that.capacity)
         if (sourceFrontStopIndex > 0)
           java.lang.System.arraycopy(that.elements, sourceFrontStartIndex, this.elements, index(lowered), sourceFrontStopIndex - sourceFrontStartIndex)
         if (sourceRearStopIndex > 0)
@@ -425,8 +457,7 @@ object Spandex extends SeqFactory[Spandex] {
       val raised = high + that.size
       if (Spandex.distance(low, raised) > capacity) false
       else if (high == stop && raised <= capacity && bounds.compareAndSet(bnds, pack(low, raised))) {
-        val (sourceFrontStartIndex, sourceFrontStopIndex) = Spandex.frontIndexes(that.start, that.stop, that.capacity)
-        val (sourceRearStartIndex, sourceRearStopIndex) = Spandex.rearIndexes(that.start, that.stop)
+        val (sourceFrontStartIndex, sourceFrontStopIndex, sourceRearStartIndex, sourceRearStopIndex) = Spandex.indices(that.start, that.stop, that.capacity)
         if (sourceFrontStopIndex > 0)
           java.lang.System.arraycopy(that.elements, sourceFrontStartIndex, this.elements, high, sourceFrontStopIndex - sourceFrontStartIndex)
         if (sourceRearStopIndex > 0)
@@ -441,9 +472,10 @@ object Spandex extends SeqFactory[Spandex] {
   private[immutable] final class Secondary[+A](
     override val primary: Primary[A],
     override val start: Int,
-    override val stop: Int)
+    override val stop: Int,
+    override val shrinkThreshold: Int)
     extends Spandex[A](start, stop) {
-    def toDebugString: String = s"${mkString("[", ", ", "]")}: Secondary(start: $start, stop: $stop, primary: ${primary.toDebugString})"
+    def toDebugString: String = s"${mkString("[", ", ", "]")}: Secondary(start: $start, stop: $stop, shrinkThreshold: $shrinkThreshold, primary: ${primary.toDebugString})"
   }
 
   private[immutable] final object Empty extends Primary[Nothing](Array.empty, 0, 0) {
@@ -457,11 +489,8 @@ object Spandex extends SeqFactory[Spandex] {
       val capacity = capacitate(n)
       val array = new Array[Any](capacity)
       xs.copyToArray(array, 0, n)
-      create(array, 0, n)
+      createPrimary(array, 0, n)
     }
-
-  def apply[A](xs: Spandex[A]): Spandex[A] =
-    xs.trim()
 
   def apply[A](it: Iterable[A]): Spandex[A] = Spandex.fromIterable(it)
 
@@ -471,48 +500,57 @@ object Spandex extends SeqFactory[Spandex] {
       val capacity = capacitate(array.length)
       val arr = new Array[Any](capacity)
       java.lang.System.arraycopy(array, 0, arr, 0, array.length)
-      create[A](arr, 0, array.length)
+      createPrimary(arr, 0, array.length)
     }
   }
-  private[Spandex] def create[A](array: Array[Any], start: Int, stop: Int): Primary[A] =
-    new Primary[A](array, start, stop)
-  private[Spandex] def create[A](primary: Primary[A], start: Int, stop: Int): Spandex[A] = {
+
+  /*
+  private[Spandex] def create[A](array: Array[Any], start: Int, stop: Int, shrinkThreshold: Int): Spandex[A] =
+    if (shrinkThreshold == 0) new Primary[A](array, start, stop)
+    else new Primary[A](array, start, stop).withAutoShrinking(shrinkThreshold)
+
+  private[Spandex] def create[A](primary: Primary[A], start: Int, stop: Int, shrinkThreshold: Int): Spandex[A] = {
     if (start == stop) Spandex.empty
-    else if (false && isExcessive(primary, start, stop))
-      shrink(primary, start, stop)
+    else if (isExcessive(primary, start, stop, shrinkThreshold))
+      shrink(primary, start, stop, shrinkThreshold)
     else
-      new Secondary[A](primary, start, stop)
+      new Secondary[A](primary, start, stop, shrinkThreshold)
+  }
+  */
+
+  private[Spandex] def createPrimary[A](array: Array[Any], start: Int, stop: Int): Primary[A] = new Primary[A](array, start, stop)
+
+  private[Spandex] def createSecondary[A](xs: Spandex[A], start: Int, stop: Int, shrinkThreshold: Int): Spandex[A] = {
+    if (start == stop) Empty.withAutoShrinking(shrinkThreshold)
+    else if (isExcessive(xs, start, stop, shrinkThreshold))
+      shrink(xs, start, stop)
+    else
+      new Secondary[A](xs.primary, start, stop, shrinkThreshold)
   }
 
-  @`inline` private def isExcessive[A](primary: Primary[A], start: Int, stop: Int) = {
-    primary.capacity > 8 && (capacitate(distance(start, stop)) * 100) / primary.capacity <= 25
+  @`inline` private def isExcessive[A](xs: Spandex[A], start: Int, stop: Int, shrinkThreshold: Int) = {
+    xs.capacity > 8 && (capacitate(distance(start, stop)) * 100) / xs.capacity <= shrinkThreshold
   }
 
   private[Spandex] def capacitate(n: Long): Int = ((((n max 8) + 7) / 8) * 8).toInt
   private[Spandex] def grow[A](xs: Spandex[A], capacity: Int) = {
-    var a = math.min(xs.start, xs.stop)
-    var b = math.max(xs.start, xs.stop)
-    val (frontStartIndex, frontStopIndex) = frontIndexes(a, b, xs.capacity)
-    val (rearStartIndex, rearStopIndex) = rearIndexes(a, b)
+    val (frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex) = Spandex.indices(xs.start min xs.stop, xs.start max xs.stop, xs.capacity)
     resize(xs, capacity, frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex)
   }
   private[Spandex] def shrink[A](xs: Spandex[A], start: Int, stop: Int) = {
-    var a = math.min(start, stop)
-    var b = math.max(start, stop)
-    val (frontStartIndex, frontStopIndex) = frontIndexes(a, b, xs.capacity)
-    val (rearStartIndex, rearStopIndex) = rearIndexes(a, b)
+    val (frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex) = Spandex.indices(start min stop, start max stop, xs.capacity)
     resize(xs, capacitate(distance(start, stop)), frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex)
   }
   private[Spandex] def resize[A](xs: Spandex[A], capacity: Int, frontStartIndex: Int, frontStopIndex: Int, rearStartIndex: Int, rearStopIndex: Int) = {
     val array = new Array[Any](capacity)
+    val start = frontStopIndex - frontStartIndex
+    val stop = rearStopIndex - rearStartIndex
     if (rearStopIndex > 0)
-      java.lang.System.arraycopy(xs.elements, rearStartIndex, array, 0, rearStopIndex - rearStartIndex)
+      java.lang.System.arraycopy(xs.elements, rearStartIndex, array, 0, stop)
     if (frontStopIndex > 0)
-      java.lang.System.arraycopy(xs.elements, frontStartIndex, array, array.length - (frontStopIndex - frontStartIndex), frontStopIndex - frontStartIndex)
-    if (xs.isReversed)
-      create(array, -(frontStopIndex - frontStartIndex), rearStopIndex - rearStartIndex).reverse
-    else
-      create(array, -(frontStopIndex - frontStartIndex), rearStopIndex - rearStartIndex)
+      java.lang.System.arraycopy(xs.elements, frontStartIndex, array, array.length - start, start)
+    // Can't use createSecondary here since it will autoShrink
+    new Secondary[A](createPrimary[A](array, -start, stop), -start, stop, xs.shrinkThreshold).withReversed(xs.isReversed)
   }
 
   private[Spandex] def isSame(a: Any, b: Any) = (
@@ -529,7 +567,7 @@ object Spandex extends SeqFactory[Spandex] {
         array(i) = f(i)
         i += 1
       }
-      create(array, 0, n)
+      createPrimary(array, 0, n)
     }
 
   override def fill[A](n: Int)(elem: => A): Spandex[A] = tabulate(n)(_ => elem)
@@ -549,7 +587,7 @@ object Spandex extends SeqFactory[Spandex] {
         array(i) = it.next()
         i += 1
       }
-      create(array, 0, n)
+      createPrimary(array, 0, n)
     case _ =>
       val builder = Spandex.newBuilder[A]()
       builder ++= it
@@ -566,7 +604,7 @@ object Spandex extends SeqFactory[Spandex] {
     */
   private[strawman] def wrap[A](xs: Array[Any], length: Int = -1): Spandex[A] =
     if (xs.length == 0) Empty
-    else create(xs, 0, if (length > -1) length else xs.length)
+    else createPrimary(xs, 0, if (length > -1) length else xs.length)
 
   def newBuilder[A](): Builder[A, Spandex[A]] =
     new GrowableBuilder(ArrayBuffer.empty[A])
@@ -578,6 +616,7 @@ object Spandex extends SeqFactory[Spandex] {
 
   override def empty[A <: Any]: Spandex[A] = Empty
 
+  /*
   @`inline`
   private[Spandex] def frontIndexes(start: Int, stop: Int, capacity: Int) = {
     if (start < 0 && stop <= 0) (capacity + start, capacity + stop)
@@ -592,6 +631,15 @@ object Spandex extends SeqFactory[Spandex] {
     else if (stop > 0) (0, stop)
     else if (start > 0) (0, start)
     else (0, 0)
+  }
+  */
+
+  @`inline`
+  private[Spandex] def indices(start: Int, stop: Int, capacity: Int): (Int, Int, Int, Int) = {
+    if (start < 0 && stop <= 0) (capacity + start, capacity + stop, 0, 0)
+    else if (start < 0) (capacity + start, capacity, 0, stop)
+    else if (stop < 0) (capacity + stop, capacity, 0, start)
+    else (0, 0, start, stop)
   }
 
   @`inline`

@@ -8,8 +8,6 @@ import org.openjdk.jmh.infra.Blackhole
 import scala.{Any, AnyRef, Int, Long, Unit, math}
 import scala.Predef.{intWrapper, longArrayOps, wrapLongArray, wrapRefArray}
 
-import scala.Predef.{intWrapper, longArrayOps}
-
 @BenchmarkMode(scala.Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Fork(1)
@@ -18,26 +16,19 @@ import scala.Predef.{intWrapper, longArrayOps}
 @State(Scope.Benchmark)
 class ScalaArrayBenchmark {
 
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980", "73121", "120000"))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980", "73121", "140000"))
   var size: Int = _
 
   var xs: scala.Array[Long] = _
-  var xss: scala.Array[scala.Array[Long]] = _
   var zipped: scala.Array[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
-  var randomIndices2: scala.Array[Int] = _
-  var randomXss: scala.Array[scala.Array[Long]] = _
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection(n: Int = size) = scala.Array((1 to n).map(_.toLong): _*)
-    xs = freshCollection()
-    xss = scala.Array.fill(1000)(freshCollection())
+    xs = scala.Array((1 to size).map(_.toLong): _*)
     zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomXss = scala.Array.fill(1000)(freshCollection(scala.util.Random.nextInt(size)))
     }
   }
 
@@ -84,7 +75,7 @@ class ScalaArrayBenchmark {
   @Benchmark
   def prependAllAppendAll(bh: Blackhole): Unit = {
     var ys = scala.Array.empty[Long]
-    val ys2 = xss(0).take(3)
+    val ys2 = xs.take(3)
     var i = 0L
     while (i < size) {
       if ((i & 1) == 1) ys = ys ++ ys2
@@ -164,7 +155,7 @@ class ScalaArrayBenchmark {
   def lookup_last(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
-      bh.consume(xss(i)(size - 1))
+      bh.consume(xs(size - 1))
       i += 1
     }
   }
@@ -203,13 +194,14 @@ class ScalaArrayBenchmark {
   def map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
 
   @Benchmark
-  @OperationsPerInvocation(1000)
+  @OperationsPerInvocation(100)
   def patch(bh: Blackhole): Unit = {
     var i = 0
-    while (i < 1000) {
+    while (i < 100) {
       val from = randomIndices(i)
-      val replaced = randomIndices2(i)
-      bh.consume(xs.patch(from, randomXss.apply(i), replaced))
+      val replaced = randomIndices(if (i > 0) i - 1 else math.min(i + 1, size))
+      val length = randomIndices(if (i > 1) i - 2 else math.min(i + 2, size))
+      bh.consume(xs.patch(from, xs.take(length), replaced))
       i += 1
     }
   }
