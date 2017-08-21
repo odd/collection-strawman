@@ -33,10 +33,11 @@ class ScalaArrayBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def prepend(bh: Blackhole): Unit = {
     var ys = scala.Array.empty[Long]
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       ys = i +: ys
       i += 1
     }
@@ -44,10 +45,11 @@ class ScalaArrayBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def append(bh: Blackhole): Unit = {
     var ys = scala.Array.empty[Long]
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       ys = ys :+ i
       i += 1
     }
@@ -55,10 +57,11 @@ class ScalaArrayBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def prependAppend(bh: Blackhole): Unit = {
     var ys = scala.Array.empty[Long]
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       if ((i & 1) == 1) ys = ys :+ i
       else ys = i +: ys
       i += 1
@@ -73,11 +76,12 @@ class ScalaArrayBenchmark {
   def appendAll(bh: Blackhole): Unit = bh.consume(xs ++ xs)
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def prependAllAppendAll(bh: Blackhole): Unit = {
     var ys = scala.Array.empty[Long]
     val ys2 = xs.take(3)
     var i = 0L
-    while (i < size) {
+    while (i < 100) {
       if ((i & 1) == 1) ys = ys ++ ys2
       else ys = ys2 ++: ys
       i += 1
@@ -199,8 +203,8 @@ class ScalaArrayBenchmark {
     var i = 0
     while (i < 100) {
       val from = randomIndices(i)
-      val replaced = randomIndices(if (i > 0) i - 1 else math.min(i + 1, size))
-      val length = randomIndices(if (i > 1) i - 2 else math.min(i + 2, size))
+      val replaced = randomIndices(if (i > 0) i - 1 else math.min(i + 1, size - 1))
+      val length = randomIndices(if (i > 1) i - 2 else math.min(i + 2, size - 1))
       bh.consume(xs.patch(from, xs.take(length), replaced))
       i += 1
     }

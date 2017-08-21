@@ -199,8 +199,8 @@ class ScalaListBenchmark {
     var i = 0
     while (i < 100) {
       val from = randomIndices(i)
-      val replaced = randomIndices(if (i > 0) i - 1 else math.min(i + 1, size))
-      val length = randomIndices(if (i > 1) i - 2 else math.min(i + 2, size))
+      val replaced = randomIndices(if (i > 0) i - 1 else math.min(i + 1, size - 1))
+      val length = randomIndices(if (i > 1) i - 2 else math.min(i + 2, size - 1))
       bh.consume(xs.patch(from, xs.take(length), replaced))
       i += 1
     }
