@@ -15,35 +15,29 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class TreeSetBenchmark {
-
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980", "73121", "120000"))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096"/*, "31980"*/, "65530"/*, "73121"*/, "131070", "7312102"))
   var size: Int = _
 
   var xs: TreeSet[Long] = _
-  var xss: scala.Array[TreeSet[Long]] = _
   var zipped: TreeSet[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
-  var randomIndices2: scala.Array[Int] = _
-  var randomXss: scala.Array[TreeSet[Long]] = _
+  def fresh(n: Int) = TreeSet((1 to size).map(_.toLong): _*)
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection(n: Int = size) = TreeSet((1 to n).map(_.toLong): _*)
-    xs = freshCollection()
-    xss = scala.Array.fill(1000)(freshCollection())
+    xs = fresh(size)
     zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomXss = scala.Array.fill(1000)(freshCollection(scala.util.Random.nextInt(size)))
     }
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def incl(bh: Blackhole): Unit = {
-    var ys = TreeSet.empty[Long]
+    var ys = fresh(size)
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       ys += i
       i += 1
     }
@@ -51,7 +45,10 @@ class TreeSetBenchmark {
   }
 
   @Benchmark
-  def concat(bh: Blackhole): Unit = bh.consume(xs ++ xs)
+  def concat(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    bh.consume(ys ++ ys)
+  }
 
   @Benchmark
   def tail(bh: Blackhole): Unit = bh.consume(xs.tail)
@@ -60,29 +57,32 @@ class TreeSetBenchmark {
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_front(bh: Blackhole): Unit = {
     var i = 0
-    while (i < size) {
-      bh.consume(xs.slice(0, i))
-      i += math.max(size / 100, 1)
+    while (i < 100) {
+      bh.consume(xs.slice(0, size / (i + 1)))
+      i += 1
     }
   }
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_rear(bh: Blackhole): Unit = {
-    var i = size - 1
-    while (i >= 0) {
-      bh.consume(xs.slice(i, size))
-      i -= math.max(size / 100, 1)
+    var i = 0
+    while (i < 100) {
+      bh.consume(xs.slice(size - size / (i + 1), size))
+      i += 1
     }
   }
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_middle(bh: Blackhole): Unit = {
-    var i = size / 2
-    while (i >= 0) {
-      bh.consume(xs.slice(i, size - i))
-      i -= math.max(size / 100, 1)
+    var i = 0
+    while (i < 100) {
+      bh.consume(xs.slice(size / 2 - size / (2 * (i + 1)), size / 2 + size / (2 * (i + 1))))
+      i += 1
     }
   }
 
@@ -120,7 +120,7 @@ class TreeSetBenchmark {
   def contains(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
-      bh.consume(xss(i).contains(i))
+      bh.consume(xs.contains(i))
       i += 1
     }
   }

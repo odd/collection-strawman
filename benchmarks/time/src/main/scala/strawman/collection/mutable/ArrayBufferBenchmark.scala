@@ -15,35 +15,29 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class ArrayBufferBenchmark {
-
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "31980", "73121", "120000"))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096"/*, "31980"*/, "65530"/*, "73121"*/, "131070", "7312102"))
   var size: Int = _
 
   var xs: ArrayBuffer[Long] = _
-  var xss: scala.Array[ArrayBuffer[Long]] = _
   var zipped: ArrayBuffer[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
-  var randomIndices2: scala.Array[Int] = _
-  var randomXss: scala.Array[ArrayBuffer[Long]] = _
+  def fresh(n: Int) = ArrayBuffer((1 to n).map(_.toLong): _*)
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    def freshCollection(n: Int = size) = ArrayBuffer((1 to n).map(_.toLong): _*)
-    xs = freshCollection()
-    xss = scala.Array.fill(1000)(freshCollection())
+    xs = fresh(size)
     zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomIndices2 = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-      randomXss = scala.Array.fill(1000)(freshCollection(scala.util.Random.nextInt(size)))
     }
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def prepend(bh: Blackhole): Unit = {
-    var ys = ArrayBuffer.empty[Long]
+    var ys = fresh(size)
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       ys.insert(0, i)
       i += 1
     }
@@ -51,10 +45,11 @@ class ArrayBufferBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def append(bh: Blackhole): Unit = {
-    var ys = ArrayBuffer.empty[Long]
+    var ys = fresh(size)
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       ys.add(i)
       i += 1
     }
@@ -62,10 +57,11 @@ class ArrayBufferBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def prependAppend(bh: Blackhole): Unit = {
-    var ys = ArrayBuffer.empty[Long]
+    var ys = fresh(size)
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       if ((i & 1) == 1) ys.add(i)
       else ys.insert(0, i)
       i += 1
@@ -74,19 +70,26 @@ class ArrayBufferBenchmark {
   }
 
   @Benchmark
-  def prependAll(bh: Blackhole): Unit = bh.consume(xs.insertAll(0, xs))
+  def prependAll(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    bh.consume(xs.insertAll(0, xs))
+  }
 
   @Benchmark
-  def appendAll(bh: Blackhole): Unit = bh.consume(xs.addAll(xs))
+  def appendAll(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    bh.consume(xs.addAll(xs))
+  }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def prependAllAppendAll(bh: Blackhole): Unit = {
-    var ys = ArrayBuffer.empty[Long]
-    val ys2 = xss(0).take(3)
+    var ys = fresh(size)
+    val zs = fresh((size / 1000) max 1)
     var i = 0L
-    while (i < size) {
-      if ((i & 1) == 1) ys.addAll(ys2)
-      else ys.insertAll(0, ys2)
+    while (i < 1000) {
+      if ((i & 1) == 1) ys.addAll(zs)
+      else ys.insertAll(0, zs)
       i += 1
     }
     bh.consume(ys)
@@ -99,29 +102,32 @@ class ArrayBufferBenchmark {
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_front(bh: Blackhole): Unit = {
     var i = 0
-    while (i < size) {
-      bh.consume(xs.slice(0, i))
-      i += math.max(size / 100, 1)
+    while (i < 100) {
+      bh.consume(xs.slice(0, size / (i + 1)))
+      i += 1
     }
   }
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_rear(bh: Blackhole): Unit = {
-    var i = size - 1
-    while (i >= 0) {
-      bh.consume(xs.slice(i, size))
-      i -= math.max(size / 100, 1)
+    var i = 0
+    while (i < 100) {
+      bh.consume(xs.slice(size - size / (i + 1), size))
+      i += 1
     }
   }
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_middle(bh: Blackhole): Unit = {
-    var i = size / 2
-    while (i >= 0) {
-      bh.consume(xs.slice(i, size - i))
-      i -= math.max(size / 100, 1)
+    var i = 0
+    while (i < 100) {
+      bh.consume(xs.slice(size / 2 - size / (2 * (i + 1)), size / 2 + size / (2 * (i + 1))))
+      i += 1
     }
   }
 
@@ -162,7 +168,7 @@ class ArrayBufferBenchmark {
   def lookup_last(bh: Blackhole): Unit = {
     var i = 0
     while (i < 1000) {
-      bh.consume(xss(i)(size - 1))
+      bh.consume(xs(size - 1))
       i += 1
     }
   }
@@ -179,7 +185,8 @@ class ArrayBufferBenchmark {
 
   @Benchmark
   @OperationsPerInvocation(1000)
-  def update_last(bh: Blackhole): Unit = {
+  def updated_last(bh: Blackhole): Unit = {
+    val ys = fresh(size)
     var i = 0
     while (i < 1000) {
       bh.consume(xs.update(size - 1, i))
@@ -201,13 +208,15 @@ class ArrayBufferBenchmark {
   def map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
 
   @Benchmark
-  @OperationsPerInvocation(1000)
+  @OperationsPerInvocation(100)
   def patch(bh: Blackhole): Unit = {
+    val ys = fresh(size)
     var i = 0
-    while (i < 1000) {
+    while (i < 100) {
       val from = randomIndices(i)
-      val replaced = randomIndices2(i)
-      bh.consume(xs.patchInPlace(from, randomXss(i), replaced))
+      val replaced = randomIndices(if (i > 0) i - 1 else math.min(i + 1, size - 1))
+      val length = randomIndices(if (i > 1) i - 2 else math.min(i + 2, size - 1))
+      bh.consume(ys.patchInPlace(from, xs.take(length), replaced))
       i += 1
     }
   }
