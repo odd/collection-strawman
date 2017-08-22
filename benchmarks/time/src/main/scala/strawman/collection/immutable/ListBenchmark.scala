@@ -15,17 +15,17 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class ListBenchmark {
-
   @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "7312102"))
   var size: Int = _
 
   var xs: List[Long] = _
   var zipped: List[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
+  def fresh(n: Int) = List((1 to n).map(_.toLong): _*)
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    xs = List((1 to size).map(_.toLong): _*)
+    xs = fresh(size)
     zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
@@ -33,10 +33,11 @@ class ListBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def prepend(bh: Blackhole): Unit = {
-    var ys = List.empty[Long]
+    var ys = fresh(size)
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       ys = i :: ys
       i += 1
     }
@@ -44,10 +45,11 @@ class ListBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def append(bh: Blackhole): Unit = {
-    var ys = List.empty[Long]
+    var ys = fresh(size)
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       ys = ys :+ i
       i += 1
     }
@@ -55,10 +57,11 @@ class ListBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def prependAppend(bh: Blackhole): Unit = {
-    var ys = List.empty[Long]
+    var ys = fresh(size)
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       if ((i & 1) == 1) ys = ys :+ i
       else ys = i :: ys
       i += 1
@@ -67,19 +70,26 @@ class ListBenchmark {
   }
 
   @Benchmark
-  def prependAll(bh: Blackhole): Unit = bh.consume(xs ++: xs)
+  def prependAll(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    bh.consume(ys ++: ys)
+  }
 
   @Benchmark
-  def appendAll(bh: Blackhole): Unit = bh.consume(xs :++ xs)
+  def appendAll(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    bh.consume(ys :++ ys)
+  }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def prependAllAppendAll(bh: Blackhole): Unit = {
-    var ys = List.empty[Long]
-    val ys2 = xs.take(3)
+    var ys = fresh(size)
+    val zs = fresh((size / 1000) max 1)
     var i = 0L
-    while (i < size) {
-      if ((i & 1) == 1) ys = ys :++ ys2
-      else ys = ys2 ++: ys
+    while (i < 1000) {
+      if ((i & 1) == 1) ys = ys :++ zs
+      else ys = zs ++: ys
       i += 1
     }
     bh.consume(ys)
@@ -92,29 +102,32 @@ class ListBenchmark {
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_front(bh: Blackhole): Unit = {
     var i = 0
-    while (i < size) {
-      bh.consume(xs.slice(0, i))
-      i += math.max(size / 100, 1)
+    while (i < 100) {
+      bh.consume(xs.slice(0, size / (i + 1)))
+      i += 1
     }
   }
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_rear(bh: Blackhole): Unit = {
-    var i = size - 1
-    while (i >= 0) {
-      bh.consume(xs.slice(i, size))
-      i -= math.max(size / 100, 1)
+    var i = 0
+    while (i < 100) {
+      bh.consume(xs.slice(size - size / (i + 1), size))
+      i += 1
     }
   }
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_middle(bh: Blackhole): Unit = {
-    var i = size / 2
-    while (i >= 0) {
-      bh.consume(xs.slice(i, size - i))
-      i -= math.max(size / 100, 1)
+    var i = 0
+    while (i < 100) {
+      bh.consume(xs.slice(size / 2 - size / (2 * (i + 1)), size / 2 + size / (2 * (i + 1))))
+      i += 1
     }
   }
 
@@ -173,9 +186,10 @@ class ListBenchmark {
   @Benchmark
   @OperationsPerInvocation(1000)
   def updated_last(bh: Blackhole): Unit = {
+    val ys = fresh(size)
     var i = 0
     while (i < 1000) {
-      bh.consume(xs.updated(size - 1, i))
+      bh.consume(ys.updated(size - 1, i))
       i += 1
     }
   }
@@ -183,9 +197,10 @@ class ListBenchmark {
   @Benchmark
   @OperationsPerInvocation(1000)
   def updated_random(bh: Blackhole): Unit = {
+    val ys = fresh(size)
     var i = 0
     while (i < 1000) {
-      bh.consume(xs.updated(randomIndices(i), i))
+      bh.consume(ys.updated(randomIndices(i), i))
       i += 1
     }
   }
@@ -196,12 +211,13 @@ class ListBenchmark {
   @Benchmark
   @OperationsPerInvocation(100)
   def patch(bh: Blackhole): Unit = {
+    val ys = fresh(size)
     var i = 0
     while (i < 100) {
       val from = randomIndices(i)
       val replaced = randomIndices(if (i > 0) i - 1 else math.min(i + 1, size - 1))
       val length = randomIndices(if (i > 1) i - 2 else math.min(i + 2, size - 1))
-      bh.consume(xs.patch(from, xs.take(length), replaced))
+      bh.consume(ys.patch(from, xs.take(length), replaced))
       i += 1
     }
   }

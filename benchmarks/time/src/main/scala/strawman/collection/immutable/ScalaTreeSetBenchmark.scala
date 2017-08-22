@@ -15,17 +15,17 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class ScalaTreeSetBenchmark {
-
   @Param(scala.Array(/*"0", */"1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "73121", "7312102"))
   var size: Int = _
 
   var xs: scala.collection.immutable.TreeSet[Long] = _
   var zipped: scala.collection.immutable.TreeSet[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
+  def fresh(n: Int) = scala.collection.immutable.TreeSet((1 to n).map(_.toLong): _*)
 
   @Setup(Level.Trial)
   def initData(): Unit = {
-    xs = scala.collection.immutable.TreeSet((1 to size).map(_.toLong): _*)
+    xs = fresh(size)
     zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
@@ -33,10 +33,11 @@ class ScalaTreeSetBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def incl(bh: Blackhole): Unit = {
-    var ys = scala.collection.immutable.TreeSet.empty[Long]
+    var ys = fresh(size)
     var i = 0L
-    while (i < size) {
+    while (i < 1000) {
       ys += i
       i += 1
     }
@@ -44,7 +45,10 @@ class ScalaTreeSetBenchmark {
   }
 
   @Benchmark
-  def concat(bh: Blackhole): Unit = bh.consume(xs ++ xs)
+  def concat(bh: Blackhole): Unit = {
+    val ys = fresh(size)
+    bh.consume(ys ++ ys)
+  }
 
   @Benchmark
   def tail(bh: Blackhole): Unit = bh.consume(xs.tail)
@@ -53,29 +57,32 @@ class ScalaTreeSetBenchmark {
   def init(bh: Blackhole): Unit = bh.consume(xs.init)
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_front(bh: Blackhole): Unit = {
     var i = 0
-    while (i < size) {
-      bh.consume(xs.slice(0, i))
-      i += math.max(size / 100, 1)
+    while (i < 100) {
+      bh.consume(xs.slice(0, size / (i + 1)))
+      i += 1
     }
   }
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_rear(bh: Blackhole): Unit = {
-    var i = size - 1
-    while (i >= 0) {
-      bh.consume(xs.slice(i, size))
-      i -= math.max(size / 100, 1)
+    var i = 0
+    while (i < 100) {
+      bh.consume(xs.slice(size - size / (i + 1), size))
+      i += 1
     }
   }
 
   @Benchmark
+  @OperationsPerInvocation(100)
   def slice_middle(bh: Blackhole): Unit = {
-    var i = size / 2
-    while (i >= 0) {
-      bh.consume(xs.slice(i, size - i))
-      i -= math.max(size / 100, 1)
+    var i = 0
+    while (i < 100) {
+      bh.consume(xs.slice(size / 2 - size / (2 * (i + 1)), size / 2 + size / (2 * (i + 1))))
+      i += 1
     }
   }
 
