@@ -15,7 +15,7 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class ArrayBufferBenchmark {
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096"/*, "31980"*/, "65530"/*, "73121"*/, "131070", "7312102"))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096"/*, "31980", "65530", "73121"*/, "131070", "7312102"))
   var size: Int = _
 
   var xs: ArrayBuffer[Long] = _
@@ -46,12 +46,38 @@ class ArrayBufferBenchmark {
 
   @Benchmark
   @OperationsPerInvocation(1000)
+  def prependTail(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    var i = 0L
+    while (i < 1000) {
+      ys.insert(0, i)
+      i += 1
+      ys = ys.tail
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
+  @OperationsPerInvocation(1000)
   def append(bh: Blackhole): Unit = {
     var ys = fresh(size)
     var i = 0L
     while (i < 1000) {
       ys.add(i)
       i += 1
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
+  @OperationsPerInvocation(1000)
+  def appendInit(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    var i = 0L
+    while (i < 1000) {
+      ys.add(i)
+      i += 1
+      ys = ys.init
     }
     bh.consume(ys)
   }

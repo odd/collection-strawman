@@ -14,14 +14,14 @@ import scala.Predef.intWrapper
 @Warmup(iterations = 12)
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
-class SpandexBenchmark {
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096"/*, "31980"*/, "65530"/*, "73121"*/, "131070", "7312102"))
+class Spandex_25Benchmark {
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096"/*, "31980", "65530", "73121"*/, "131070", "7312102"))
   var size: Int = _
 
   var xs: Spandex[Long] = _
   var zipped: Spandex[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
-  def fresh(n: Int) = Spandex((1 to n).map(_.toLong): _*)
+  def fresh(n: Int) = Spandex((1 to n).map(_.toLong): _*).withAutoShrinking(25)
 
   @Setup(Level.Trial)
   def initData(): Unit = {
@@ -46,12 +46,38 @@ class SpandexBenchmark {
 
   @Benchmark
   @OperationsPerInvocation(1000)
+  def prependTail(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    var i = 0L
+    while (i < 1000) {
+      ys = i +: ys
+      i += 1
+      ys = ys.tail
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
+  @OperationsPerInvocation(1000)
   def append(bh: Blackhole): Unit = {
     var ys = fresh(size)
     var i = 0L
     while (i < 1000) {
       ys = ys :+ i
       i += 1
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
+  @OperationsPerInvocation(1000)
+  def appendInit(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    var i = 0L
+    while (i < 1000) {
+      ys = ys :+ i
+      i += 1
+      ys = ys.init
     }
     bh.consume(ys)
   }

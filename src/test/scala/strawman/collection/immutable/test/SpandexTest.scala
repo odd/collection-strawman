@@ -723,7 +723,8 @@ class SpandexTest {
     assertEquals("Multiple reversed with multiple in middle replacing max", Spandex(3, 4, 5, 6), Spandex(1, 2, 3).reverse.patch(1, Spandex(4, 5, 6), 245))
   }
   @Test
-  def testShrink(): Unit = {
+  def testAutoTrimming(): Unit = {
+    // Default shrinkThreshold is 25%
     assertEquals("1 out of 8 is not shrunk", 8, Spandex(1, 2, 3, 4, 5, 6).slice(0, 1).primary.elements.length)
     assertEquals("2 out of 8 is not shrunk", 8, Spandex(1, 2, 3, 4, 5, 6).slice(0, 2).primary.elements.length)
     assertEquals("3 out of 8 is not shrunk", 8, Spandex(1, 2, 3, 4, 5, 6).slice(0, 3).primary.elements.length)
@@ -763,6 +764,16 @@ class SpandexTest {
     assertEquals("after removing 385 out of 512 capacity is 128", 128, s.primary.elements.length)
     s = s.slice(0, 2)
     assertEquals("after keeping 2 out of 128 capacity is 8", 8, s.primary.elements.length)
+    val s2 = Spandex.range(0, 32).withoutAutoShrinking
+    assertEquals("2 out of 32 is not shrunk", 32, s2.slice(0, 2).primary.elements.length)
+    assertEquals("8 out of 32 is not shrunk", 32, s2.slice(0, 8).primary.elements.length)
+    assertEquals("9 out of 32 is not shrunk", 32, s2.slice(0, 9).primary.elements.length)
+    assertEquals("24 out of 32 is not shrunk", 32, s2.slice(0, 24).primary.elements.length)
+    val s3 = s2.withAutoShrinking(75)
+    assertEquals("2 out of 32 is shrunk to 8", 8, s3.slice(0, 2).primary.elements.length)
+    assertEquals("8 out of 32 is shrunk to 8", 8, s3.slice(0, 8).primary.elements.length)
+    assertEquals("9 out of 32 is shrunk to 16", 16, s3.slice(0, 9).primary.elements.length)
+    assertEquals("24 out of 32 is shrunk to 24", 24, s3.slice(0, 24).primary.elements.length)
   }
   @Test
   def testPadTo(): Unit = {
