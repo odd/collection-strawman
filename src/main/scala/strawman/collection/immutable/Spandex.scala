@@ -32,8 +32,14 @@ import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
   * <br/>
   * <br/>
   * The smallest array size is eight and when the underlying array is too small to fit a requested addition a new array twice as large is
-  * allocated. If after an operation the size of the result is smaller than or equal the shrink threshold percentage of the size of its primary (defaults to 25%),
-  * a new primary is created (using an array with a capacity suitable to the size of the result).
+  * allocated.
+  * <br/>
+  * <br/>
+  * A configurable auto shrink threshold percentage (default is 25%) can be configured via the <code>withAutoShrinking</code> method.
+  * When this threshold percentage is set to <code>T</code> (an integer between 0 and 100), any operation having a result size which
+  * is at most <code>T</code> percent of the capacity of its primary will lead to the underlying array being copied to a new array
+  * having a capacity suitable to the size of the result. The same effect can be obtained on a <code>Spandex</code> having <code>T</code>
+  * set to zero (i.e. auto shrinking disabled) and instead calling <code>trim</code> on the result.
   * <br/>
   * <br/>
   * <b>Examples</b>
