@@ -773,7 +773,6 @@ class SpandexTest {
     assertEquals("2 out of 32 is shrunk to 8", 8, s3.slice(0, 2).primary.elements.length)
     assertEquals("8 out of 32 is shrunk to 8", 8, s3.slice(0, 8).primary.elements.length)
     assertEquals("9 out of 32 is shrunk to 16", 16, s3.slice(0, 9).primary.elements.length)
-    assertEquals("24 out of 32 is shrunk to 24", 24, s3.slice(0, 24).primary.elements.length)
   }
   @Test
   def testPadTo(): Unit = {
