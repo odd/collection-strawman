@@ -46,12 +46,38 @@ class ListBufferBenchmark {
 
   @Benchmark
   @OperationsPerInvocation(1000)
+  def prependTail(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    var i = 0L
+    while (i < 1000) {
+      ys.insert(0, i)
+      i += 1
+      ys = ys.tail
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
+  @OperationsPerInvocation(1000)
   def append(bh: Blackhole): Unit = {
     var ys = fresh(size)
     var i = 0L
     while (i < 1000) {
       ys.add(i)
       i += 1
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
+  @OperationsPerInvocation(1000)
+  def appendInit(bh: Blackhole): Unit = {
+    var ys = fresh(size)
+    var i = 0L
+    while (i < 1000) {
+      ys.add(i)
+      i += 1
+      ys = ys.init
     }
     bh.consume(ys)
   }
@@ -70,15 +96,29 @@ class ListBufferBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def prependAll(bh: Blackhole): Unit = {
     var ys = fresh(size)
-    bh.consume(xs.insertAll(0, xs))
+    val zs = fresh((size / 1000) max 1)
+    var i = 0L
+    while (i < 1000) {
+      ys = zs ++: ys
+      i += 1
+    }
+    bh.consume(ys)
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def appendAll(bh: Blackhole): Unit = {
     var ys = fresh(size)
-    bh.consume(xs.addAll(xs))
+    val zs = fresh((size / 1000) max 1)
+    var i = 0L
+    while (i < 1000) {
+      ys = ys :++ zs
+      i += 1
+    }
+    bh.consume(ys)
   }
 
   @Benchmark
