@@ -96,15 +96,29 @@ class VectorBenchmark {
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def prependAll(bh: Blackhole): Unit = {
     var ys = fresh(size)
-    bh.consume(ys ++: ys)
+    val zs = fresh((size / 1000) max 1)
+    var i = 0L
+    while (i < 1000) {
+      ys = zs ++: ys
+      i += 1
+    }
+    bh.consume(ys)
   }
 
   @Benchmark
+  @OperationsPerInvocation(1000)
   def appendAll(bh: Blackhole): Unit = {
     var ys = fresh(size)
-    bh.consume(ys :++ ys)
+    val zs = fresh((size / 1000) max 1)
+    var i = 0L
+    while (i < 1000) {
+      ys = ys :++ zs
+      i += 1
+    }
+    bh.consume(ys)
   }
 
   @Benchmark

@@ -36,7 +36,7 @@ import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
   * <br/>
   * <br/>
   * A configurable auto shrink percentage threshold (defaults to 25%) can be configured via the <code>withAutoShrinking</code> method.
-  * When this percentage threshold is set to <code>T</code> (an integer between 0 and 100), any operation having a result size which
+  * When this percentage threshold is set to <code>T</code> (an integer between 0 and 100), any operation having a result with a size which
   * is at most <code>T</code> percent of the capacity of its primary will lead to the underlying array being copied to a new array
   * with a capacity suitable to the size of the result. The same effect can be obtained on a <code>Spandex</code> having <code>T</code>
   * set to zero (i.e. auto shrinking disabled) and instead calling <code>trim</code> on the result.
