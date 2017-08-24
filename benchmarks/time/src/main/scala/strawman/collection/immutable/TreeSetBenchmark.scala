@@ -21,7 +21,7 @@ class TreeSetBenchmark {
   var xs: TreeSet[Long] = _
   var zipped: TreeSet[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
-  def fresh(n: Int) = TreeSet((1 to size).map(_.toLong): _*)
+  def fresh(n: Int) = TreeSet((1 to n).map(_.toLong): _*)
 
   @Setup(Level.Trial)
   def initData(): Unit = {
