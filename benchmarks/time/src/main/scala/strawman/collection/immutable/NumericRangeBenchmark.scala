@@ -20,7 +20,7 @@ class NumericRangeBenchmark {
 
   var xs: NumericRange[Int] = _
   var randomIndices: scala.Array[Int] = _
-  def fresh(n: Int) = NumericRange.inclusive(1, size, 1)
+  def fresh(n: Int) = NumericRange.inclusive(1, n, 1)
 
   @Setup(Level.Trial)
   def initData(): Unit = {
