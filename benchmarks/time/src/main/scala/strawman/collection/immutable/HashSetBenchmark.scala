@@ -21,7 +21,7 @@ class HashSetBenchmark {
   var xs: HashSet[Long] = _
   var zipped: HashSet[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
-  def fresh(n: Int) = HashSet((1 to size).map(_.toLong): _*)
+  def fresh(n: Int) = HashSet((1 to n).map(_.toLong): _*)
 
   @Setup(Level.Trial)
   def initData(): Unit = {
