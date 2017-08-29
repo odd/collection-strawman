@@ -34,7 +34,7 @@ class NumericRangeBenchmark {
   @Setup(Level.Invocation)
   def initInvocation(): Unit = {
     xs = fresh(size)
-    zs = fresh((size / 1000) max 2)
+    zs = NumericRange.inclusive(-1, (-size / 1000) min -2, -1)
   }
 
   @Benchmark

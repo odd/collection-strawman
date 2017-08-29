@@ -34,7 +34,7 @@ class ScalaVectorBenchmark {
   @Setup(Level.Invocation)
   def initInvocation(): Unit = {
     xs = fresh(size)
-    zs = fresh((size / 1000) max 2)
+    zs = fresh((size / 1000) max 2).map(-_)
     zipped = xs.map(x => (x, x))
   }
 

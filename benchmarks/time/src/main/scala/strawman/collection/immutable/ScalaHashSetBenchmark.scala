@@ -34,7 +34,7 @@ class ScalaHashSetBenchmark {
   @Setup(Level.Invocation)
   def initInvocation(): Unit = {
     xs = fresh(size)
-    zs = fresh((size / 1000) max 2)
+    zs = fresh((size / 1000) max 2).map(-_)
     zipped = xs.map(x => (x, x))
   }
 
@@ -63,13 +63,12 @@ class ScalaHashSetBenchmark {
   @Benchmark
   @OperationsPerInvocation(100)
   def expand_concat(bh: Blackhole): Unit = {
-    var ys = xs
+    val ys = xs
     var i = 0L
     while (i < 100) {
-      ys = ys ++ zs.map(i * _)
+      bh.consume(ys ++ zs)
       i += 1
     }
-    bh.consume(ys)
   }
 
   @Benchmark
