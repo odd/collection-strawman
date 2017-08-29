@@ -73,6 +73,9 @@ trait SeqOps[+A, +CC[_], +C] extends collection.SeqOps[A, CC, C] {
    */
   def append[B >: A](elem: B): CC[B] = fromIterable(View.Append(toIterable, elem))
 
+  /** Alias for `appendAll` from here on down */
+  @`inline` final override def concat[B >: A](suffix: collection.Iterable[B]) = appendAll(suffix)
+
   /** Alias for `append`
     *
     * Note that :-ending operators are right associative (see example).
