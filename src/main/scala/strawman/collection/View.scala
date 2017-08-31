@@ -143,7 +143,8 @@ object View extends IterableFactory[View] {
   case class Take[A](underlying: Iterable[A], n: Int) extends View[A] {
     def iterator() = underlying.iterator().take(n)
     protected val normN = n max 0
-    override def knownSize = if (underlying.knownSize >= 0) underlying.knownSize min normN else -1
+    override def knownSize =
+      if (underlying.knownSize >= 0) underlying.knownSize min normN else -1
   }
 
   case class TakeWhile[A](underlying: Iterable[A], p: A => Boolean) extends View[A] {
@@ -217,7 +218,7 @@ object View extends IterableFactory[View] {
   }
 
   private[collection] class Patched[A](underlying: Iterable[A], from: Int, other: IterableOnce[A], replaced: Int) extends View[A] {
-    if (from < 0 || from > size) throw new IndexOutOfBoundsException(from.toString)
+    if (from < 0 || (knownSize > -1 && from > knownSize)) throw new IndexOutOfBoundsException(from.toString)
     def iterator(): Iterator[A] = underlying.iterator().patch(from, other.iterator(), replaced)
   }
 
