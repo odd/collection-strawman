@@ -15,7 +15,7 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class TreeSetBenchmark {
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096"/*, "31980", "65530", "73121"*/, "131070", "7312102"))
+  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
   var size: Int = _
 
   var xs: TreeSet[Long] = _
