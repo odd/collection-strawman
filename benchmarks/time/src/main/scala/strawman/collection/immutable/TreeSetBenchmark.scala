@@ -34,7 +34,7 @@ class TreeSetBenchmark {
   @Setup(Level.Invocation)
   def initInvocation(): Unit = {
     xs = fresh(size)
-    zs = fresh((size / 1000) max 2).map(-_).map(-_)
+    zs = fresh((size / 1000) max 2).map(-_)
     zipped = xs.map(x => (x, x))
   }
 
@@ -63,10 +63,9 @@ class TreeSetBenchmark {
   @Benchmark
   @OperationsPerInvocation(100)
   def expand_concat(bh: Blackhole): Unit = {
-    val ys = xs
     var i = 0L
     while (i < 100) {
-      bh.consume(ys ++ zs)
+      bh.consume(xs ++ zs)
       i += 1
     }
   }

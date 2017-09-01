@@ -63,10 +63,9 @@ class ScalaTreeSetBenchmark {
   @Benchmark
   @OperationsPerInvocation(100)
   def expand_concat(bh: Blackhole): Unit = {
-    val ys = xs
     var i = 0L
     while (i < 100) {
-      bh.consume(ys ++ zs)
+      bh.consume(xs ++ zs)
       i += 1
     }
   }
