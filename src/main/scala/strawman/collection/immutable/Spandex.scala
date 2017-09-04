@@ -644,7 +644,7 @@ object Spandex extends SeqFactory[Spandex] {
     val field = classOf[ArrayBuffer[_]].getDeclaredField("array")
     field.setAccessible(true)
     field
-  }.toOption.filter(_ => false)
+  }.toOption
 
   def newBuilder[A](): Builder[A, Spandex[A]] =
     new GrowableBuilder(ArrayBuffer.empty[A])
