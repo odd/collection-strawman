@@ -2,17 +2,14 @@ package strawman
 package collection
 package immutable
 
-import java.lang.reflect.Field
 import java.util.concurrent.atomic.AtomicLong
 import scala.{`inline`, Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, IllegalArgumentException, IndexOutOfBoundsException, Int, Long, NoSuchElementException, Nothing, StringContext, Unit, UnsupportedOperationException}
-import scala.Predef.{<:<, classOf, genericWrapArray, intWrapper, longWrapper, println, String}
-import scala.math
+import scala.Predef.{<:<, genericWrapArray, intWrapper, String}
 import scala.math._
 import scala.reflect.ClassTag
 import scala.runtime.ScalaRunTime
-import scala.util.Try
-import strawman.collection.{IterableFactory, IterableOnce, Iterator, LinearSeq, View}
-import strawman.collection.mutable.{ArrayBuffer, Builder, GrowableBuilder}
+//import strawman.collection.{IterableFactory, IterableOnce, Iterator, LinearSeq, View}
+import strawman.collection.mutable.{Builder, ReusableBuilder}
 
 /**
   * A <i>Spandex</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
@@ -238,7 +235,7 @@ sealed abstract class Spandex[+A] private (protected val start: Int, protected v
 
   override final def appendAll[B >: A](xs: collection.Iterable[B]): Spandex[B] = appendAll1(xs)
 
-  private final def appendAll1[B >: A](xs: collection.IterableOnce[B], knownSize: Int = -1): Spandex[B] =
+  private[Spandex] final def appendAll1[B >: A](xs: collection.IterableOnce[B], knownSize: Int = -1): Spandex[B] =
     xs match {
       case _ if knownSize == 0 =>
         this
@@ -622,7 +619,7 @@ object Spandex extends SeqFactory[Spandex] {
     case _ =>
       val builder = Spandex.newBuilder[A]()
       builder ++= xs
-      builder.result()
+      builder.result().withAutoShrinking()
   }
 
   /**
@@ -635,31 +632,29 @@ object Spandex extends SeqFactory[Spandex] {
     */
   private[strawman] def wrap[A](xs: Array[Any], length: Int = -1): Spandex[A] =
     if (xs.length == 0) Empty
-    else createPrimary(xs, 0, if (length > -1) length else xs.length).toSecondary
+    else createPrimary(xs, 0, if (length > -1) length else xs.length).toSecondary.withoutAutoShrinking
 
-  /**
-    * Cache reflection field accessor for wrapping array created in `ArrayBuffer` without copying.
-    */
-  private[this] val arrayField = Try {
-    val field = classOf[ArrayBuffer[_]].getDeclaredField("array")
-    field.setAccessible(true)
-    field
-  }.toOption
+  /** A class to build instances of `Spandex`.  This builder is reusable. */
+  final class Builder[A](var sizeHint: Int = 0) extends ReusableBuilder[A, Spandex[A]] {
+    private var elems: Spandex[A] = empty
 
-  def newBuilder[A](): Builder[A, Spandex[A]] =
-    new GrowableBuilder(ArrayBuffer.empty[A])
-      .mapResult { b =>
-        val capacity = capacitate(b.length) max 16 // Smallest size of the `ArrayBuffer` array is 16
-        val array = arrayField
-          .map(_.get(b).asInstanceOf[Array[Any]])
-          .filter(_.length <= capacity) // Only use the `ArrayBuffer` array if it isn't to large
-          .getOrElse { // Otherwise copy `ArrayBuffer` contents to fresh array
-            val arr = scala.Array.ofDim[Any](capacity)
-            b.asInstanceOf[ArrayBuffer[Any]].copyToArray(arr)
-            arr
-          }
-        wrap(array, b.length)
-      }
+    private def empty = createPrimary(scala.Array.ofDim[Any](capacitate(sizeHint max 0)), 0, 0).toSecondary.withoutAutoShrinking
+
+    override def sizeHint(size: Int) = sizeHint = size
+
+    override def clear() = elems = empty
+
+    override def result() = elems
+
+    override def add(elem: A) = {
+      elems :+= elem
+      this
+    }
+  }
+
+  def newBuilder[A](): Builder[A] = new Builder[A]()
+
+  def newBuilder[A](sizeHint: Int): Builder[A] = new Builder[A](sizeHint)
 
   override def empty[A <: Any]: Spandex[A] = Empty
 
@@ -676,3 +671,4 @@ object Spandex extends SeqFactory[Spandex] {
     if (x < y) y - x
     else x - y
 }
+
