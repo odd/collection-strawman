@@ -8,7 +8,6 @@ import scala.Predef.{<:<, genericWrapArray, intWrapper, String}
 import scala.math._
 import scala.reflect.ClassTag
 import scala.runtime.ScalaRunTime
-//import strawman.collection.{IterableFactory, IterableOnce, Iterator, LinearSeq, View}
 import strawman.collection.mutable.{Builder, ReusableBuilder}
 
 /**
