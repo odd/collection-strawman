@@ -15,7 +15,7 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class NumericRangeBenchmark {
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096"/*, "31980", "65530", "73121"*/, "131070", "7312102"))
+  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
   var size: Int = _
 
   var xs: NumericRange[Int] = _
@@ -33,7 +33,7 @@ class NumericRangeBenchmark {
   @Setup(Level.Invocation)
   def initInvocation(): Unit = {
     xs = fresh(size)
-    zs = fresh((size / 1000) max 2)
+    zs = NumericRange.inclusive(-1, (-size / 1000) min -2, -1)
   }
 
   @Benchmark

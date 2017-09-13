@@ -15,7 +15,7 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class Spandex_0Benchmark {
-  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096"/*, "31980", "65530", "73121"*/, "131070", "7312102"))
+  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
   var size: Int = _
 
   var xs: Spandex[Long] = _
@@ -34,15 +34,15 @@ class Spandex_0Benchmark {
   @Setup(Level.Invocation)
   def initInvocation(): Unit = {
     xs = fresh(size)
-    zs = fresh((size / 1000) max 2)
+    zs = fresh((size / 1000) max 2).map(-_)
     zipped = xs.map(x => (x, x))
   }
 
   @Benchmark
-  @OperationsPerInvocation(10)
+  @OperationsPerInvocation(100)
   def create(bh: Blackhole): Unit = {
     var i = 0L
-    while (i < 10) {
+    while (i < 100) {
       bh.consume(fresh(size))
       i += 1
     }

@@ -60,16 +60,17 @@ sealed class NumericRange[T](
   override lazy val length: Int = NumericRange.count(start, end, step, isInclusive)
   override def size: Int = length
   override def isEmpty = length == 0
-  override def head: T = if (isEmpty) Nil.head else start
-  override def tail: NumericRange[T] =
-    if (isEmpty) Nil.tail
-    else new NumericRange(start + step, end, step, isInclusive)
   override def last: T =
-    if (length == 0) Nil.last
+    if (length == 0) Nil.head
     else locationAfterN(length - 1)
   override def init: NumericRange[T] =
     if (isEmpty) Nil.init
     else new NumericRange(start, end - step, step, isInclusive)
+
+  override def head: T = if (isEmpty) Nil.head else start
+  override def tail: NumericRange[T] =
+    if (isEmpty) Nil.tail
+    else new NumericRange(start + step, end, step, isInclusive)
 
   /** Create a new range with the start and end values of this range and
     *  a new `step`.
