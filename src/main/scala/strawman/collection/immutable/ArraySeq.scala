@@ -11,7 +11,7 @@ import scala.runtime.ScalaRunTime
 import strawman.collection.mutable.{Builder, ReusableBuilder}
 
 /**
-  * A <i>ArraySeq</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
+  * An <i>ArraySeq</i> is an (ostensible) immutable array-like collection designed to support the following performance characteristics:
   * <ul>
   * <li>constant time <code>head</code>, <code>last</code>, <code>tail</code>, <code>init</code>, <code>take</code>, <code>takeRight</code>, <code>drop</code>, <code>dropRight</code>, <code>slice</code> and <code>reverse</code></li>
   * <li>amortised constant time <code>prepend</code>/<code>prependAll</code>, <code>append</code>/<code>appendAll</code> and <code>concat</code> (depending on the complexity of <code>java.lang.System.arraycopy</code>)</li>
