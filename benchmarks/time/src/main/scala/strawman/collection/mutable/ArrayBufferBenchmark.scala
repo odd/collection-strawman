@@ -15,7 +15,7 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class ArrayBufferBenchmark {
-  @Param(scala.Array(/*"0", */"1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
+  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
   var size: Int = _
 
   var xs: ArrayBuffer[Long] = _
@@ -24,18 +24,14 @@ class ArrayBufferBenchmark {
   var randomIndices: scala.Array[Int] = _
   def fresh(n: Int) = ArrayBuffer((1 to n).map(_.toLong): _*)
 
-  @Setup(Level.Trial)
-  def initTrial(): Unit = {
-    if (size > 0) {
-      randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-    }
-  }
-
-  @Setup(Level.Invocation)
-  def initInvocation(): Unit = {
+  @Setup(Level.Iteration)
+  def initIteration(): Unit = {
     xs = fresh(size)
     zs = fresh((size / 1000) max 2).map(-_)
     zipped = xs.map(x => (x, x))
+    if (size > 0) {
+      randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
+    }
   }
 
   @Benchmark

@@ -26,18 +26,14 @@ class ScalaArrayBenchmark {
   var randomIndices: scala.Array[Int] = _
   def fresh(n: Int) = scala.Array((1 to n).map(_.toLong): _*)
 
-  @Setup(Level.Trial)
-  def initTrial(): Unit = {
-    if (size > 0) {
-      randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
-    }
-  }
-
-  @Setup(Level.Invocation)
-  def initInvocation(): Unit = {
+  @Setup(Level.Iteration)
+  def initIteration(): Unit = {
     xs = fresh(size)
     zs = fresh((size / 1000) max 2).map(-_)
     zipped = xs.map(x => (x, x))
+    if (size > 0) {
+      randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
+    }
   }
 
   @Benchmark

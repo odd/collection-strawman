@@ -15,7 +15,6 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class RangeBenchmark {
-
   @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
   var size: Int = _
 
@@ -24,17 +23,13 @@ class RangeBenchmark {
   var randomIndices: scala.Array[Int] = _
   def fresh(n: Int) = Range.inclusive(1, n, 1)
 
-  @Setup(Level.Trial)
-  def initTrial(): Unit = {
+  @Setup(Level.Iteration)
+  def initIteration(): Unit = {
+    xs = fresh(size)
+    zs = Range.inclusive(-1, (-size / 1000) min -2, -1)
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
     }
-  }
-
-  @Setup(Level.Invocation)
-  def initInvocation(): Unit = {
-    xs = fresh(size)
-    zs = Range.inclusive(-1, (-size / 1000) min -2, -1)
   }
 
   @Benchmark

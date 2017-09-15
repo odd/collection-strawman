@@ -37,7 +37,7 @@ class ArrayViewBenchmark {
     array
   }
 
-  @Setup(Level.Trial)
+  @Setup(Level.Iteration)
   def initData(): Unit = {
 
     v = ArrayView(fillArray(size))

@@ -27,7 +27,7 @@ class ArrayBaselineBenchmark {
   var v: Array[Long] = _
   var vLo: Array[Long] = _
 
-  @Setup(Level.Trial)
+  @Setup(Level.Iteration)
   def initData(): Unit = {
 
     def fillArray(range: Int) = {
