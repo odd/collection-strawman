@@ -23,17 +23,13 @@ class NumericRangeBenchmark {
   var randomIndices: scala.Array[Int] = _
   def fresh(n: Int) = NumericRange.inclusive(1, n, 1)
 
-  @Setup(Level.Trial)
-  def initTrial(): Unit = {
+  @Setup(Level.Iteration)
+  def initIteration(): Unit = {
+    xs = fresh(size)
+    zs = NumericRange.inclusive(-1, (-size / 1000) min -2, -1)
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
     }
-  }
-
-  @Setup(Level.Invocation)
-  def initInvocation(): Unit = {
-    xs = fresh(size)
-    zs = NumericRange.inclusive(-1, (-size / 1000) min -2, -1)
   }
 
   @Benchmark

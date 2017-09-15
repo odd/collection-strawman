@@ -418,8 +418,7 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
     * This method is dangerous since it disregards the existing bounds of the current primary.
     * Only used during benchmarking to disregard any state affected in previous iterations.
     */
-  private[strawman] def reset(): Unit = {
-    // Can't use createSecondary here since it will auto shrink
+  private[strawman] def reset(): ArraySeq[A] = {
     ArraySeq.createSecondary(ArraySeq.createPrimary(elements, primary.start, primary.stop), start, stop, shrinkThreshold, autoShrink = false).withReversed(isReversed)
   }
 }

@@ -24,8 +24,11 @@ class ArraySeq_25Benchmark {
   var randomIndices: scala.Array[Int] = _
   def fresh(n: Int) = ArraySeq((1 to n).map(_.toLong): _*).withAutoShrinking(25)
 
-  @Setup(Level.Trial)
-  def initTrial(): Unit = {
+  @Setup(Level.Iteration)
+  def initIteration(): Unit = {
+    xs = fresh(size)
+    zs = fresh((size / 1000) max 2).map(-_)
+    zipped = xs.map(x => (x, x))
     if (size > 0) {
       randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
     }
@@ -33,9 +36,9 @@ class ArraySeq_25Benchmark {
 
   @Setup(Level.Invocation)
   def initInvocation(): Unit = {
-    xs = fresh(size)
-    zs = fresh((size / 1000) max 2).map(-_)
-    zipped = xs.map(x => (x, x))
+    xs = xs.reset()
+    zs = zs.reset()
+    zipped = zipped.reset()
   }
 
   @Benchmark
