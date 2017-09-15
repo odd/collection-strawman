@@ -23,8 +23,8 @@ class NumericRangeBenchmark {
   var randomIndices: scala.Array[Int] = _
   def fresh(n: Int) = NumericRange.inclusive(1, n, 1)
 
-  @Setup(Level.Iteration)
-  def initIteration(): Unit = {
+  @Setup(Level.Trial)
+  def initTrial(): Unit = {
     xs = fresh(size)
     zs = NumericRange.inclusive(-1, (-size / 1000) min -2, -1)
     if (size > 0) {
@@ -33,14 +33,7 @@ class NumericRangeBenchmark {
   }
 
   @Benchmark
-  @OperationsPerInvocation(100)
-  def create(bh: Blackhole): Unit = {
-    var i = 0L
-    while (i < 100) {
-      bh.consume(fresh(size))
-      i += 1
-    }
-  }
+  def create(bh: Blackhole): Unit = bh.consume(fresh(size))
 
   @Benchmark
   def traverse_foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))

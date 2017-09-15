@@ -24,8 +24,8 @@ class LazyListBenchmark {
   var randomIndices: scala.Array[Int] = _
   def fresh(n: Int) = LazyList((1 to n).map(_.toLong): _*)
 
-  @Setup(Level.Iteration)
-  def initIteration(): Unit = {
+  @Setup(Level.Trial)
+  def initTrial(): Unit = {
     xs = fresh(size)
     zs = fresh((size / 1000) max 2).map(-_)
     zipped = xs.map(x => (x, x))
@@ -35,14 +35,7 @@ class LazyListBenchmark {
   }
 
   @Benchmark
-  @OperationsPerInvocation(100)
-  def create(bh: Blackhole): Unit = {
-    var i = 0L
-    while (i < 100) {
-      bh.consume(fresh(size))
-      i += 1
-    }
-  }
+  def create(bh: Blackhole): Unit = bh.consume(fresh(size))
 
   @Benchmark
   @OperationsPerInvocation(1000)
