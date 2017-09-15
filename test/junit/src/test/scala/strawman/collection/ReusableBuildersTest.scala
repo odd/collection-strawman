@@ -1,6 +1,6 @@
 package strawman.collection
 
-import strawman.collection.immutable.{List, Nil, Vector, Spandex}
+import strawman.collection.immutable.{List, Nil, Vector, ArraySeq}
 import scala.Predef.{genericArrayOps => _, classOf, assert, intWrapper}
 
 import org.junit.runner.RunWith

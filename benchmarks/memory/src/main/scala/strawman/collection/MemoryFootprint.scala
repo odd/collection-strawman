@@ -1,6 +1,6 @@
 package bench
 
-import strawman.collection.immutable.{LazyList, List, Range, NumericRange, Vector, ImmutableArray, Spandex}
+import strawman.collection.immutable.{LazyList, List, Range, NumericRange, Vector, ImmutableArray, ArraySeq}
 import strawman.collection.mutable.{ArrayBuffer, ListBuffer}
 
 import scala.{Any, AnyRef, App, Int, Long, Seq, StringContext}
@@ -52,7 +52,7 @@ object MemoryFootprint extends App {
       "scala.Array"   -> benchmark(scala.Array.fill(_)(obj)),
       "Range"         -> benchmark(Range(0, _)),
       "NumericRange"  -> benchmark(NumericRange(0, _, 1)),
-      "Spandex"       -> benchmark(Spandex.fill(_)(obj))
+      "ArraySeq"       -> benchmark(ArraySeq.fill(_)(obj))
   )
 
   // We use a format similar to the one used by JMH so that

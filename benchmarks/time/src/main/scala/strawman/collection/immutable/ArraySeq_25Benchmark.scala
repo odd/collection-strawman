@@ -14,15 +14,15 @@ import scala.Predef.intWrapper
 @Warmup(iterations = 12)
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
-class Spandex_0Benchmark {
+class ArraySeq_25Benchmark {
   @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
   var size: Int = _
 
-  var xs: Spandex[Long] = _
-  var zs: Spandex[Long] = _
-  var zipped: Spandex[(Long, Long)] = _
+  var xs: ArraySeq[Long] = _
+  var zs: ArraySeq[Long] = _
+  var zipped: ArraySeq[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
-  def fresh(n: Int) = Spandex((1 to n).map(_.toLong): _*).withoutAutoShrinking
+  def fresh(n: Int) = ArraySeq((1 to n).map(_.toLong): _*).withAutoShrinking(25)
 
   @Setup(Level.Trial)
   def initTrial(): Unit = {

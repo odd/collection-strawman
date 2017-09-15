@@ -1,7 +1,7 @@
 package strawman.collection
 
 import scala.Predef.{genericArrayOps => _, augmentString => _, classOf, intWrapper, Manifest, manifest}
-import strawman.collection.immutable.{List, Nil, Vector, Spandex}
+import strawman.collection.immutable.{List, Nil, Vector, ArraySeq}
 
 import org.junit.Test
 import org.junit.Ignore
@@ -575,10 +575,10 @@ package IndexedTestImpl {
       res.result()
     }
   }
-  class SpandexTest extends ImmutableIndexedSeqTest[Spandex[String], String]  with StringTestData {
+  class ArraySeqTest extends ImmutableIndexedSeqTest[ArraySeq[String], String]  with StringTestData {
 
-    override protected def underTest(size: Int): Spandex[String] = {
-      var res = Spandex.newBuilder[String]
+    override protected def underTest(size: Int): ArraySeq[String] = {
+      var res = ArraySeq.newBuilder[String]
       for (i <- 0 until size)
         res += expectedValueAtIndex(i)
       res.result()
