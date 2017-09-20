@@ -13,6 +13,8 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 class ArraySeqTest {
+  val O = null
+
   @Test
   def testEmpty(): Unit = {
     assertEquals("apply with no arguments is equal to empty", ArraySeq.empty, ArraySeq())
@@ -22,7 +24,6 @@ class ArraySeqTest {
 
   @Test
   def testApply(): Unit = {
-    val O = null
     assertEquals("apply with 00 arguments has correct elements array", List(), ArraySeq().primary.elements.to(List))
     assertEquals("apply with 01 argument  has correct elements array", List(1, O, O, O, O, O, O, O), ArraySeq(1).primary.elements.to(List))
     assertEquals("apply with 02 arguments has correct elements array", List(1, 2, O, O, O, O, O, O), ArraySeq(1, 2).primary.elements.to(List))
@@ -36,6 +37,14 @@ class ArraySeqTest {
     assertEquals("apply with 10 arguments has correct elements array", List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, O, O, O, O, O, O), ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).primary.elements.to(List))
     assertEquals("apply with 11 arguments has correct elements array", List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, O, O, O, O, O), ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11).primary.elements.to(List))
     assertEquals("apply with 11 arguments has correct elements array", List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, O, O, O, O), ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).primary.elements.to(List))
+  }
+
+  @Test
+  def testBuild(): Unit = {
+    assertEquals("empty", ArraySeq.empty, ArraySeq.newBuilder().result())
+    assertEquals("single", ArraySeq(2), ArraySeq.newBuilder().add(2).result())
+    assertEquals("multiple one by one", ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), ArraySeq.newBuilder().add(1).add(2).add(3).add(4).add(5).add(6).add(7).add(8).add(9).add(10).add(11).add(12).result())
+    assertEquals("multiple all at once", ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), ArraySeq.newBuilder().addAll(ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)).result())
   }
 
   @Test
@@ -57,7 +66,7 @@ class ArraySeqTest {
     val h = g.dropRight(7)
     assertEquals("expands correctly 6", List(1, O, O, O, O, O, O, 0), (0 +: h).primary.elements.to(List))
     val i = g.dropRight(8)
-    assertEquals("expands correctly 7", List(0, O, O, O, O, O, O, O), (0 +: i).primary.elements.to(List))
+    assertEquals("expands correctly 7", List(O, O, O, O, O, O, O, 0), (0 +: i).primary.elements.to(List))
   }
 
   @Test
@@ -178,6 +187,30 @@ class ArraySeqTest {
     assertEquals("reverse map single", ArraySeq(4), ArraySeq(2).reverse.map(n => n * n))
     assertEquals("map multiple", ArraySeq(1, 4, 9, 16), ArraySeq(1, 2, 3, 4).map(n => n * n))
     assertEquals("reverse map multiple", ArraySeq(16, 9, 4, 1), ArraySeq(1, 2, 3, 4).reverse.map(n => n * n))
+  }
+
+  @Test
+  def testCollect(): Unit = {
+    assertEquals("empty", ArraySeq.empty, ArraySeq().collect { case n => n })
+    assertEquals("reverse empty", ArraySeq.empty, ArraySeq().reverse.collect { case n => n })
+    assertEquals("single", ArraySeq(4), ArraySeq(2).collect { case n => n * n })
+    assertEquals("single miss", ArraySeq(2), ArraySeq(2).collect {
+      case n if n != 2 => n * n
+      case n => n
+    } )
+    assertEquals("reverse single", ArraySeq(4), ArraySeq(2).reverse.collect { case n => n * n})
+    assertEquals("reverse single miss", ArraySeq(2), ArraySeq(2).reverse.collect {
+      case n if n != 2 => n * n
+      case n => n
+    })
+    assertEquals("multiple mixed", ArraySeq(1, 2, 9, 16), ArraySeq(1, 2, 3, 4).collect {
+      case n if n != 2 => n * n
+      case n => n
+    })
+    assertEquals("reverse multiple mixed", ArraySeq(16, 9, 2, 1), ArraySeq(1, 2, 3, 4).reverse.collect {
+      case n if n != 2 => n * n
+      case n => n
+    })
   }
 
   @Test
@@ -515,6 +548,19 @@ class ArraySeqTest {
     assertEquals("single index where not exists", -1, ArraySeq(1).indexWhere(x => x == 2))
     assertEquals("multiple index where exists", 1, ArraySeq(1, 2, 3, 4).indexWhere(x => x % 2 == 0))
     assertEquals("multiple index where not exists", -1, ArraySeq(1, 2, 3, 4).indexWhere(x => x == 5))
+    assertEquals("multiple index where exists with from", 3, ArraySeq(1, 2, 3, 4).indexWhere(x => x % 2 == 0, 2))
+    assertEquals("multiple index where not exists with from", -1, ArraySeq(1, 2, 3, 4).indexWhere(x => x == 5, 2))
+  }
+
+  @Test
+  def testLastIndexWhere(): Unit = {
+    assertEquals("empty last index where", -1, ArraySeq.empty[Int].lastIndexWhere(_ => true))
+    assertEquals("single last index where exists", 0, ArraySeq(1).lastIndexWhere(x => x == 1))
+    assertEquals("single last index where not exists", -1, ArraySeq(1).lastIndexWhere(x => x == 2))
+    assertEquals("multiple last index where exists", 3, ArraySeq(1, 2, 3, 4).lastIndexWhere(x => x % 2 == 0))
+    assertEquals("multiple last index where not exists", -1, ArraySeq(1, 2, 3, 4).lastIndexWhere(x => x == 5))
+    assertEquals("multiple last index where exists with end", 1, ArraySeq(1, 2, 3, 4).lastIndexWhere(x => x % 2 == 0, 2))
+    assertEquals("multiple last index where not exists with end", -1, ArraySeq(1, 2, 3, 4).lastIndexWhere(x => x == 5, 2))
   }
 
   @Test
@@ -782,5 +828,38 @@ class ArraySeqTest {
     assertEquals("reversed multiple to 12 is same", ArraySeq(12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1), ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).reverse.padTo(12, 0))
     assertEquals("multiple to 24", ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).padTo(24, 0))
     assertEquals("reversed multiple to 24", ArraySeq(12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).reverse.padTo(24, 0))
+  }
+
+  @Test
+  def testDistinct(): Unit = {
+    assertEquals("empty is empty", ArraySeq.empty, ArraySeq.empty.distinct)
+    assertEquals("single is same", ArraySeq(2), ArraySeq(2).distinct)
+    assertEquals("multiple without duplicates is same", ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12), ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).distinct)
+    assertEquals("reversed multiple without duplicates is same", ArraySeq(12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1), ArraySeq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).reverse.distinct)
+    assertEquals("multiple with duplicates", ArraySeq(1, 2, 3, 4, 5, 6, 7, 8), ArraySeq(1, 2, 3, 4, 5, 6, 1, 2, 7, 6, 8).distinct)
+    assertEquals("reversed multiple with duplicates", ArraySeq(8, 6, 7, 2, 1, 5, 4, 3), ArraySeq(1, 2, 3, 4, 5, 6, 1, 2, 7, 6, 8).reverse.distinct)
+  }
+
+  @Test
+  def testReset(): Unit = {
+    val a = ArraySeq(1, 2, 3)
+    assertEquals("a", ArraySeq(1, 2, 3), a)
+    assertEquals("a.primary", List(1, 2, 3, O, O, O, O, O), a.primary.elements.to(List))
+    a.primary.reset()
+    assertEquals("a after resetting", ArraySeq(1, 2, 3), a)
+    assertEquals("a.primary after resetting", List(1, 2, 3, O, O, O, O, O), a.primary.elements.to(List))
+    val b = a :+ 4
+    assertEquals("a after appending", ArraySeq(1, 2, 3), a)
+    assertEquals("b after appending", ArraySeq(1, 2, 3, 4), b)
+    assertEquals("a.primary after appending", List(1, 2, 3, 4, O, O, O, O), a.primary.elements.to(List))
+    a.primary.reset()
+    assertEquals("a after appending and resetting", ArraySeq(1, 2, 3), a)
+    assertEquals("b after appending and resetting", ArraySeq(1, 2, 3, 4), b)
+    assertEquals("a.primary after appending and resetting", List(1, 2, 3, 4, O, O, O, O), a.primary.elements.to(List))
+    val c = a :+ 5
+    assertEquals("a after appending and resetting and appending", ArraySeq(1, 2, 3), a)
+    assertEquals("b after appending and resetting and appending", ArraySeq(1, 2, 3, 5), b)
+    assertEquals("c after appending and resetting and appending", ArraySeq(1, 2, 3, 5), c)
+    assertEquals("a.primary after appending and resetting and appending", List(1, 2, 3, 5, O, O, O, O), a.primary.elements.to(List))
   }
 }

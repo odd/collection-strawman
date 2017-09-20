@@ -1,4 +1,6 @@
-package strawman.collection.immutable
+package strawman
+package collection
+package immutable
 
 import java.util.concurrent.TimeUnit
 
@@ -16,7 +18,7 @@ import scala.Predef.intWrapper
 @State(Scope.Benchmark)
 class ArrayViewBenchmark {
 
-  @Param(scala.Array("39", "282", "73121", "7312102"))
+  @Param(scala.Array("39", "282", "4096", "131070", "7312102"))
   var size: Int = _
 
   @Param(scala.Array("39"))

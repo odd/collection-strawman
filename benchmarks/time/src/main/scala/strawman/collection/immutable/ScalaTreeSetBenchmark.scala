@@ -1,4 +1,6 @@
-package strawman.collection.immutable
+package strawman
+package collection
+package immutable
 
 import java.util.concurrent.TimeUnit
 
@@ -15,7 +17,8 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class ScalaTreeSetBenchmark {
-  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
+  //@Param(scala.Array("0", "1"/*, "2", "3", "4"*/, "7", "8"/*, "15"*/, "16", "17", "39"/*, "282", "4096", "131070", "7312102"*/))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "131070", "7312102"))
   var size: Int = _
 
   var xs: scala.collection.immutable.TreeSet[Long] = _
@@ -35,7 +38,18 @@ class ScalaTreeSetBenchmark {
   }
 
   @Benchmark
-  def create(bh: Blackhole): Unit = bh.consume(fresh(size))
+  def create_apply(bh: Blackhole): Unit = bh.consume(fresh(size))
+
+  @Benchmark
+  def create_build(bh: Blackhole): Unit = {
+    var i = 0L
+    val builder = xs.companion.newBuilder[Long]
+    while (i < size) {
+      builder += i
+      i += 1
+    }
+    bh.consume(builder.result())
+  }
 
   @Benchmark
   @OperationsPerInvocation(1000)
@@ -122,6 +136,19 @@ class ScalaTreeSetBenchmark {
 
   @Benchmark
   def transform_map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
+
+  @Benchmark
+  def transform_collect(bh: Blackhole): Unit = bh.consume(xs.collect { case n if n % 5 == 0 => n })
+
+  @Benchmark
+  def transform_flatMap(bh: Blackhole): Unit = bh.consume(xs.flatMap {
+    case n if n % 3 == 0 => scala.List(n, -n)
+    case n if n % 5 == 0 => scala.List(n)
+    case _ => scala.Nil
+  })
+
+  @Benchmark
+  def transform_filter(bh: Blackhole): Unit = bh.consume(xs.filter(_ % 5 == 0))
 
   @Benchmark
   @OperationsPerInvocation(100)

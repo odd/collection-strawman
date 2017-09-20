@@ -1,11 +1,13 @@
-package strawman.collection.immutable
+package strawman
+package collection
+package immutable
 
 import java.util.concurrent.TimeUnit
 
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.{Any, AnyRef, Int, Long, Unit, math}
+import scala.{Any, AnyRef, Int, Long, Ordering, Unit, math}
 import scala.Predef.intWrapper
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
@@ -15,7 +17,8 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class TreeSetBenchmark {
-  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
+  //@Param(scala.Array("0", "1"/*, "2", "3", "4"*/, "7", "8"/*, "15"*/, "16", "17", "39"/*, "282", "4096", "131070", "7312102"*/))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "131070", "7312102"))
   var size: Int = _
 
   var xs: TreeSet[Long] = _
@@ -35,7 +38,18 @@ class TreeSetBenchmark {
   }
 
   @Benchmark
-  def create(bh: Blackhole): Unit = bh.consume(fresh(size))
+  def create_apply(bh: Blackhole): Unit = bh.consume(fresh(size))
+
+  @Benchmark
+  def create_build(bh: Blackhole): Unit = {
+    var i = 0L
+    val builder = xs.iterableFactory.newBuilder[Long]()
+    while (i < size) {
+      builder += i
+      i += 1
+    }
+    bh.consume(builder.result())
+  }
 
   @Benchmark
   @OperationsPerInvocation(1000)
@@ -122,6 +136,21 @@ class TreeSetBenchmark {
 
   @Benchmark
   def transform_map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
+
+  /*
+  @Benchmark
+  def transform_collect(bh: Blackhole): Unit = bh.consume(xs.collect[Long] { case n if n % 5 == 0 => n })
+
+  @Benchmark
+  def transform_flatMap(bh: Blackhole): Unit = bh.consume(xs.flatMap {
+    case n if n % 3 == 0 => List(n, -n)
+    case n if n % 5 == 0 => List(n)
+    case _ => Nil
+  })
+  */
+
+  @Benchmark
+  def transform_filter(bh: Blackhole): Unit = bh.consume(xs.filter(_ % 5 == 0))
 
   @Benchmark
   @OperationsPerInvocation(100)

@@ -1,4 +1,6 @@
-package strawman.collection.immutable
+package strawman
+package collection
+package immutable
 
 import java.util.concurrent.TimeUnit
 
@@ -15,10 +17,12 @@ import scala.Predef.{intWrapper, $conforms}
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class ScalaListBenchmark {
-  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
+  //@Param(scala.Array("0", "1"/*, "2", "3", "4"*/, "7", "8"/*, "15"*/, "16", "17", "39"/*, "282", "4096", "131070", "7312102"*/))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "131070"/*, "7312102"*/))
   var size: Int = _
 
   var xs: scala.List[Long] = _
+  var ys: scala.List[Long] = _
   var zs: scala.List[Long] = _
   var zipped: scala.List[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
@@ -27,6 +31,8 @@ class ScalaListBenchmark {
   @Setup(Level.Trial)
   def initTrial(): Unit = {
     xs = fresh(size)
+    val xsl = xs.splitAt(size / 2)._1
+    ys = xsl ++ xsl.reverse
     zs = fresh((size / 1000) max 2).map(-_)
     zipped = xs.map(x => (x, x))
     if (size > 0) {
@@ -35,7 +41,31 @@ class ScalaListBenchmark {
   }
 
   @Benchmark
-  def create(bh: Blackhole): Unit = bh.consume(fresh(size))
+  def create_apply(bh: Blackhole): Unit = bh.consume(fresh(size))
+
+  @Benchmark
+  def create_build(bh: Blackhole): Unit = {
+    var i = 0L
+    val builder = xs.companion.newBuilder[Long]
+    while (i < size) {
+      builder += i
+      i += 1
+    }
+    bh.consume(builder.result())
+  }
+
+  val +: = scala.collection.+:
+  val :+ = scala.collection.:+
+  @Benchmark
+  def extract_palindrome(bh: Blackhole): Unit = {
+    def isPalindrome[A](xs: scala.Seq[A]): Boolean = {
+      xs match {
+        case first +: middle :+ last => first == last && isPalindrome(middle)
+        case _ => true
+      }
+    }
+    bh.consume(isPalindrome(ys))
+  }
 
   @Benchmark
   @OperationsPerInvocation(1000)
@@ -257,6 +287,19 @@ class ScalaListBenchmark {
 
   @Benchmark
   def transform_map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
+
+  @Benchmark
+  def transform_collect(bh: Blackhole): Unit = bh.consume(xs.collect { case n if n % 5 == 0 => n })
+
+  @Benchmark
+  def transform_flatMap(bh: Blackhole): Unit = bh.consume(xs.flatMap {
+    case n if n % 3 == 0 => scala.List(n, -n)
+    case n if n % 5 == 0 => scala.List(n)
+    case _ => scala.Nil
+  })
+
+  @Benchmark
+  def transform_filter(bh: Blackhole): Unit = bh.consume(xs.filter(_ % 5 == 0))
 
   @Benchmark
   @OperationsPerInvocation(100)

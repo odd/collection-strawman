@@ -1,4 +1,6 @@
-package strawman.collection.immutable
+package strawman
+package collection
+package immutable
 
 import java.util.concurrent.TimeUnit
 
@@ -15,10 +17,13 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class ArraySeq_0Benchmark {
-  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
+
+  //@Param(scala.Array("0", "1"/*, "2", "3", "4"*/, "7", "8"/*, "15"*/, "16", "17", "39"/*, "282", "4096", "131070", "7312102"*/))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "131070", "7312102"))
   var size: Int = _
 
   var xs: ArraySeq[Long] = _
+  var ys: ArraySeq[Long] = _
   var zs: ArraySeq[Long] = _
   var zipped: ArraySeq[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
@@ -27,6 +32,8 @@ class ArraySeq_0Benchmark {
   @Setup(Level.Trial)
   def initTrial(): Unit = {
     xs = fresh(size)
+    val xsl = xs.splitAt(size / 2)._1
+    ys = xsl ++ xsl.reverse
     zs = fresh((size / 1000) max 2).map(-_)
     zipped = xs.map(x => (x, x))
     if (size > 0) {
@@ -34,26 +41,35 @@ class ArraySeq_0Benchmark {
     }
   }
 
-  @Setup(Level.Invocation)
-  def initInvocation(): Unit = {
-    xs = xs.reset()
-    zs = zs.reset()
-    zipped = zipped.reset()
+  @Benchmark
+  def create_apply(bh: Blackhole): Unit = bh.consume(fresh(size))
+
+  @Benchmark
+  def create_build(bh: Blackhole): Unit = {
+    var i = 0L
+    val builder = xs.iterableFactory.newBuilder[Long]()
+    while (i < size) {
+      builder += i
+      i += 1
+    }
+    bh.consume(builder.result())
   }
 
   @Benchmark
-  @OperationsPerInvocation(100)
-  def create(bh: Blackhole): Unit = {
-    var i = 0L
-    while (i < 100) {
-      bh.consume(fresh(size))
-      i += 1
+  def extract_palindrome(bh: Blackhole): Unit = {
+    def isPalindrome[A](xs: Seq[A]): Boolean = {
+      xs match {
+        case first +: middle :+ last => first == last && isPalindrome(middle)
+        case _ => true
+      }
     }
+    bh.consume(isPalindrome(ys))
   }
 
   @Benchmark
   @OperationsPerInvocation(1000)
   def expand_prepend(bh: Blackhole): Unit = {
+    xs.primary.reset()
     var ys = xs
     var i = 0L
     while (i < 1000) {
@@ -66,6 +82,7 @@ class ArraySeq_0Benchmark {
   @Benchmark
   @OperationsPerInvocation(1000)
   def expand_prependTail(bh: Blackhole): Unit = {
+    xs.primary.reset()
     var ys = xs
     var i = 0L
     while (i < 1000) {
@@ -79,6 +96,7 @@ class ArraySeq_0Benchmark {
   @Benchmark
   @OperationsPerInvocation(1000)
   def expand_append(bh: Blackhole): Unit = {
+    xs.primary.reset()
     var ys = xs
     var i = 0L
     while (i < 1000) {
@@ -91,6 +109,7 @@ class ArraySeq_0Benchmark {
   @Benchmark
   @OperationsPerInvocation(1000)
   def expand_appendInit(bh: Blackhole): Unit = {
+    xs.primary.reset()
     var ys = xs
     var i = 0L
     while (i < 1000) {
@@ -104,6 +123,7 @@ class ArraySeq_0Benchmark {
   @Benchmark
   @OperationsPerInvocation(1000)
   def expand_prependAppend(bh: Blackhole): Unit = {
+    xs.primary.reset()
     var ys = xs
     var i = 0L
     while (i < 1000) {
@@ -117,6 +137,7 @@ class ArraySeq_0Benchmark {
   @Benchmark
   @OperationsPerInvocation(1000)
   def expand_prependAll(bh: Blackhole): Unit = {
+    xs.primary.reset()
     var ys = xs
     var i = 0L
     while (i < 1000) {
@@ -129,6 +150,7 @@ class ArraySeq_0Benchmark {
   @Benchmark
   @OperationsPerInvocation(1000)
   def expand_appendAll(bh: Blackhole): Unit = {
+    xs.primary.reset()
     var ys = xs
     var i = 0L
     while (i < 1000) {
@@ -141,6 +163,7 @@ class ArraySeq_0Benchmark {
   @Benchmark
   @OperationsPerInvocation(1000)
   def expand_prependAllAppendAll(bh: Blackhole): Unit = {
+    xs.primary.reset()
     var ys = xs
     var i = 0L
     while (i < 1000) {
@@ -152,7 +175,10 @@ class ArraySeq_0Benchmark {
   }
 
   @Benchmark
-  def expand_padTo(bh: Blackhole): Unit = bh.consume(xs.padTo(size * 2, 42))
+  def expand_padTo(bh: Blackhole): Unit = {
+    xs.primary.reset()
+    bh.consume(xs.padTo(size * 2, 42))
+  }
 
   @Benchmark
   def traverse_foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
@@ -271,6 +297,19 @@ class ArraySeq_0Benchmark {
 
   @Benchmark
   def transform_map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
+
+  @Benchmark
+  def transform_collect(bh: Blackhole): Unit = bh.consume(xs.collect { case n if n % 5 == 0 => n })
+
+  @Benchmark
+  def transform_flatMap(bh: Blackhole): Unit = bh.consume(xs.flatMap {
+    case n if n % 3 == 0 => List(n, -n)
+    case n if n % 5 == 0 => List(n)
+    case _ => Nil
+  })
+
+  @Benchmark
+  def transform_filter(bh: Blackhole): Unit = bh.consume(xs.filter(_ % 5 == 0))
 
   @Benchmark
   @OperationsPerInvocation(100)

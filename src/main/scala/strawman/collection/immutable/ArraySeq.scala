@@ -3,8 +3,8 @@ package collection
 package immutable
 
 import java.util.concurrent.atomic.AtomicLong
-import scala.{`inline`, Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, IllegalArgumentException, IndexOutOfBoundsException, Int, Long, NoSuchElementException, Nothing, StringContext, Unit, UnsupportedOperationException}
-import scala.Predef.{<:<, genericWrapArray, intWrapper, String}
+import scala.{`inline`, Any, AnyRef, Array, ArrayIndexOutOfBoundsException, Boolean, IllegalArgumentException, IndexOutOfBoundsException, Int, Long, NoSuchElementException, Nothing, Option, Some, None, PartialFunction, StringContext, Unit, UnsupportedOperationException}
+import scala.Predef.{<:<, genericWrapArray, intWrapper, String, println}
 import scala.math._
 import scala.reflect.ClassTag
 import scala.runtime.ScalaRunTime
@@ -66,7 +66,7 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
 
   def toDebugString: String
 
-  override def toString = toDebugString // Should be removed once finished
+  override final def toString = toDebugString // Should be removed once finished
 
   // Could be private but is not to allow for access from test cases
   private[immutable] def primary: ArraySeq.Primary[A]
@@ -106,15 +106,13 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
     * Returns a <code>ArraySeq</code> that uses the specified auto shrinking percentage threshold.
     * @param threshold the maximum <code>size / capacity</code> percentage (defaults to <code>DefaultAutoShrinkingThreshold</code>).
     */
-  def withAutoShrinking(threshold: Int = ArraySeq.DefaultAutoShrinkThreshold): ArraySeq[A] =
-    //if (threshold == ArraySeq.DefaultAutoShrinkThreshold) this
-    //else ArraySeq.createSecondary(this, start, stop, threshold)
+  final def withAutoShrinking(threshold: Int = ArraySeq.DefaultAutoShrinkThreshold): ArraySeq[A] =
     ArraySeq.createSecondary(this, start, stop, threshold)
 
   /**
     * Returns a <code>ArraySeq</code> that uses no auto shrinking (has an auto shrinking percentage threshold of <code>0</code>).
     */
-  def withoutAutoShrinking: ArraySeq[A] = withAutoShrinking(0)
+  final def withoutAutoShrinking: ArraySeq[A] = withAutoShrinking(0)
 
   override final def length = size
 
@@ -146,6 +144,16 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
   override final def takeRight(n: Int): ArraySeq[A] =
     slice(size - ((n min size) max 0), size)
 
+  override final def takeWhile(p: (A) => Boolean): ArraySeq[A] = {
+    var i = 0
+    val sz = size
+    while (i < sz) {
+      if (!p(fetch(i))) return slice(0, i)
+      else i += 1
+    }
+    this
+  }
+
   override final def drop(n: Int): ArraySeq[A] =
     slice(n, size)
 
@@ -154,10 +162,32 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
     slice(0, l - ((n min l) max 0))
   }
 
-  override def span(p: A => Boolean): (ArraySeq[A], ArraySeq[A]) = {
+  override final def dropWhile(p: (A) => Boolean): ArraySeq[A] = {
+    var i = 0
+    val sz = size
+    while (i < sz) {
+      if (!p(fetch(i))) return slice(i, sz)
+      else i += 1
+    }
+    ArraySeq.empty
+  }
+
+  override final def span(p: (A) => Boolean) = {
     val prefix = takeWhile(p)
-    val suffix = drop(prefix.size)
-    (prefix, suffix)
+    (prefix, drop(prefix.size))
+  }
+
+  override final def partition(p: (A) => Boolean) = {
+    val l, r = newSpecificBuilder()
+    var i = 0
+    val sz = size
+    while (i < sz) {
+      val elem = fetch(i)
+      if (p(elem)) l += elem
+      else r += elem
+      i += 1
+    }
+    (l.result(), r.result())
   }
 
   override final def head: A =
@@ -189,15 +219,13 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
   final def rightPadTo[B >: A](len: Int, elem: B): ArraySeq[B] = padTo(len, elem)
 
   override final def prepend[B >: A](elem: B): ArraySeq[B] =
-    if (isEmpty) ArraySeq(elem)
-    else if (size == capacity) elem +: ArraySeq.allocate(this, ArraySeq.capacitate(capacity + 1))
+    if (size == capacity) elem +: ArraySeq.allocate(this, ArraySeq.capacitate(capacity + 1))
     else if (nonReversed && primary.prependElement(elem, start)) ArraySeq.createSecondary(primary, start - 1, stop, shrinkThreshold)
     else if (isReversed && primary.appendElement(elem, start)) ArraySeq.createSecondary(primary, start + 1, stop, shrinkThreshold) // as it is reversed start is really stop and stop is really start
     else elem +: ArraySeq.allocate(this, ArraySeq.capacitate(size + 1))
 
   override final def append[B >: A](elem: B): ArraySeq[B] =
-    if (isEmpty) ArraySeq(elem)
-    else if (size == capacity) ArraySeq.allocate(this, ArraySeq.capacitate(capacity + 1)) :+ elem
+    if (size == capacity) ArraySeq.allocate(this, ArraySeq.capacitate(capacity + 1)) :+ elem
     else if (nonReversed && primary.appendElement(elem, stop)) ArraySeq.createSecondary(primary, start, stop + 1, shrinkThreshold)
     else if (isReversed && primary.prependElement(elem, stop)) ArraySeq.createSecondary(primary, start, stop - 1, shrinkThreshold) // as it is reversed start is really stop and stop is really start
     else ArraySeq.allocate(this, ArraySeq.capacitate(size + 1)) :+ elem
@@ -214,7 +242,7 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
         prepend(xs.iterator().next())
       case that: Iterable[B] if that.knownSize == 1 =>
         prepend(that.head)
-      case _ if this.isEmpty =>
+      case _ if this eq ArraySeq.Empty =>
         ArraySeq.fromIterable(xs, knownSize)
       case that: ArraySeq[B] if this.isReversed || that.isReversed =>
         ArraySeq.fromIterable(View.Concat(that, this), this.knownSize + that.knownSize)
@@ -244,7 +272,7 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
         append(xs.iterator().next())
       case that: Iterable[B] if that.knownSize == 1 =>
         append(that.head)
-      case _ if this.isEmpty =>
+      case _ if this eq ArraySeq.Empty =>
         ArraySeq.fromIterable(xs, knownSize)
       case that: ArraySeq[B] if this.isReversed || that.isReversed =>
         ArraySeq.fromIterable(View.Concat(this, that), this.knownSize + that.knownSize)
@@ -263,7 +291,7 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
     }
 
   override final def map[B](f: A => B): ArraySeq[B] =
-    if (isEmpty) ArraySeq.empty
+    if (isEmpty) this.asInstanceOf[ArraySeq[B]]
     else {
       val capacity = ArraySeq.capacitate(size)
       val array = scala.Array.ofDim[Any](capacity)
@@ -276,6 +304,53 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
       ArraySeq.createPrimary[B](array, start, stop).withAutoShrinking(shrinkThreshold)
     }
 
+  override final def collect[B](pf: PartialFunction[A, B]): ArraySeq[B] =
+    if (isEmpty) this.asInstanceOf[ArraySeq[B]]
+    else {
+      // Comment copied from `strawman.collection.IterableOps.collectFirst`:
+      // Presumably the fastest way to get in and out of a partial function is for a sentinel function to return itself
+      // (Tested to be lower-overhead than runWith.  Would be better yet to not need to (formally) allocate it)
+      val sentinel: scala.Function1[A, Any] = new scala.runtime.AbstractFunction1[A, Any]{ def apply(a: A) = this }
+      val builder = ArraySeq.newSpecificBuilder[B](size, shrinkThreshold)
+      var i = 0
+      val sz = size
+      while (i < sz) {
+        val x = pf.applyOrElse(fetch(i), sentinel)
+        if (x.asInstanceOf[AnyRef] ne sentinel) builder += x.asInstanceOf[B]
+        i += 1
+      }
+      builder.result()
+    }
+
+  override final def flatMap[B](f: (A) => IterableOnce[B]) =
+    if (isEmpty) this.asInstanceOf[ArraySeq[B]]
+    else {
+      val builder = ArraySeq.newSpecificBuilder[B](size, shrinkThreshold)
+      var i = 0
+      val sz = size
+      while (i < sz) {
+        builder ++= f(fetch(i))
+        i += 1
+      }
+      builder.result()
+    }
+
+  override final def filter(p: (A) => Boolean) =
+    if (isEmpty) this
+    else {
+      val builder = ArraySeq.newSpecificBuilder[A](size, shrinkThreshold)
+      var i = 0
+      val sz = size
+      while (i < sz) {
+        val elem = fetch(i)
+        if (p(elem)) builder += elem
+        i += 1
+      }
+      builder.result()
+    }
+
+  override final def filterNot(p: (A) => Boolean) = filter(x => !p(x))
+
   override final def zip[B](xs: collection.Iterable[B]): ArraySeq[(A, B)] = xs match {
     case that: ArraySeq[B] =>
       ArraySeq.tabulate(this.size min that.size) { i =>
@@ -285,7 +360,7 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
       fromIterable[(A, B)](View.Zip[A, B](coll, xs), xs.knownSize)
   }
 
-  override def unzip[A1, A2](implicit asPair: <:<[A, (A1, A2)]): (ArraySeq[A1], ArraySeq[A2]) = {
+  override final def unzip[A1, A2](implicit asPair: <:<[A, (A1, A2)]): (ArraySeq[A1], ArraySeq[A2]) = {
     val arr1 = scala.Array.ofDim[Any](capacity)
     val arr2 = scala.Array.ofDim[Any](capacity)
     var i = 0
@@ -313,43 +388,106 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
     }
 
   override final def foreach[U](f: (A) => U): Unit = {
-      var i = 0
-      val n = size
-      while (i < n) {
-        f(fetch(i))
-        i += 1
-      }
+    var i = 0
+    val sz = size
+    while (i < sz) {
+      f(fetch(i))
+      i += 1
     }
+  }
 
   override final def reverse: ArraySeq[A] =
-    if (isEmpty) ArraySeq.empty.withAutoShrinking(shrinkThreshold)
-    else if (size == 1) this
+    if (size <= 1) this
     else ArraySeq.createSecondary(primary, stop, start, shrinkThreshold)
 
   private[ArraySeq] final def withReversed(reversed: Boolean): ArraySeq[A] =
     if (!reversed) this
     else reverse
 
-  override protected[this] def reversed: ArraySeq[A] = reverse
+  override protected[this] final def reversed: ArraySeq[A] = reverse
 
   override final def foldLeft[B](z: B)(op: (B, A) => B): B = {
     var acc = z
-    foreach(x => acc = op(acc, x))
+    var i = 0
+    val sz = size
+    while (i < sz) {
+      acc = op(acc, fetch(i))
+      i += 1
+    }
     acc
   }
 
-  override final def foldRight[B](z: B)(op: (A, B) => B): B =
-    reverse.foldLeft(z) {
-      case (acc, x) => op(x, acc)
+  override final def foldRight[B](z: B)(op: (A, B) => B): B = {
+    var acc = z
+    var i = size - 1
+    while (i >= 0) {
+      acc = op(fetch(i), acc)
+      i -= 1
     }
+    acc
+  }
 
   override final def indexWhere(p: (A) => Boolean, from: Int = 0): Int = {
     var i = from
-    while (i < size) {
+    val sz = size
+    while (i < sz) {
       if (p(fetch(i))) return i
       i += 1
     }
     -1
+  }
+
+  override final def lastIndexWhere(p: (A) => Boolean, end: Int = length - 1): Int = {
+    var i = end
+    while (i >= 0) {
+      if (p(fetch(i))) return i
+      i -= 1
+    }
+    -1
+  }
+
+  override final def forall(p: (A) => Boolean): Boolean = {
+    var result = true
+    var i = 0
+    val sz = size
+    while (result && i < sz) {
+      result = p(fetch(i))
+      i += 1
+    }
+    result
+  }
+
+  override final def exists(p: (A) => Boolean) = {
+    var result = false
+    var i = 0
+    val sz = size
+    while (!result && i < sz) {
+      result = p(fetch(i))
+      i += 1
+    }
+    result
+  }
+
+  override final def count(p: (A) => Boolean) = {
+    var result = 0
+    var i = 0
+    val sz = size
+    while (i < sz) {
+      if (p(fetch(i))) result += 1
+      i += 1
+    }
+    result
+  }
+
+  override final def find(p: (A) => Boolean): Option[A] = {
+    var i = 0
+    val sz = size
+    while (i < sz) {
+      val elem = fetch(i)
+      if (p(elem)) return Some(elem)
+      i += 1
+    }
+    None
   }
 
   override final def updated[B >: A](i: Int, elem: B): ArraySeq[B] = {
@@ -406,21 +544,13 @@ sealed abstract class ArraySeq[+A] private (protected val start: Int, protected 
 
   protected[this] final def fromIterable[B](c: collection.Iterable[B], size: Int = -1): ArraySeq[B] = ArraySeq.fromIterable(c, size)
 
-  override def iterableFactory: SeqFactory[ArraySeq] = ArraySeq
+  override final def iterableFactory: SeqFactory[ArraySeq] = ArraySeq
 
   protected[this] final def fromSpecificIterable(coll: collection.Iterable[A]): ArraySeq[A] = fromIterable(coll)
 
-  override protected[this] def newSpecificBuilder(): Builder[A, ArraySeq[A]] = ArraySeq.newBuilder()
+  override protected[this] def newSpecificBuilder(): Builder[A, ArraySeq[A]] = ArraySeq.newSpecificBuilder(shrinkThreshold = shrinkThreshold)
 
   override final def className = "ArraySeq"
-
-  /**
-    * This method is dangerous since it disregards the existing bounds of the current primary.
-    * Only used during benchmarking to disregard any state affected in previous iterations.
-    */
-  private[strawman] def reset(): ArraySeq[A] = {
-    ArraySeq.createSecondary(ArraySeq.createPrimary(elements, primary.start, primary.stop), start, stop, shrinkThreshold, autoShrink = false).withReversed(isReversed)
-  }
 }
 
 object ArraySeq extends SeqFactory[ArraySeq] {
@@ -446,6 +576,13 @@ object ArraySeq extends SeqFactory[ArraySeq] {
     private[this] def unpackLow(l: Long): Int = (l >> 32).toInt
     @`inline`
     private[this] def unpackHigh(l: Long): Int = l.toInt
+
+    /**
+      * This method is highly dangerous since it resets the existing bounds of this primary. Only use when no other
+      * referrers to this primary exist with absolute certainty (for example during benchmarking to disregard any state
+      * affected in previous iterations).
+      */
+    def reset(): Unit = bounds.set(pack(start, stop))
 
     private[ArraySeq] def prependElement[B >: A](elem: B, start: Int): Boolean = {
       val bnds = bounds.get()
@@ -526,7 +663,7 @@ object ArraySeq extends SeqFactory[ArraySeq] {
   }
 
   override def apply[A](xs: A*): ArraySeq[A] =
-    if (xs.isEmpty) ArraySeq.Empty
+    if (xs.isEmpty) Empty
     else {
       val n = xs.size
       val capacity = capacitate(n)
@@ -537,13 +674,15 @@ object ArraySeq extends SeqFactory[ArraySeq] {
 
   def apply[A](it: Iterable[A]): ArraySeq[A] = ArraySeq.fromIterable(it)
 
-  def apply[A](array: Array[A]): ArraySeq[A] = {
-    if (array.length == 0) ArraySeq.empty
+  def apply[A](array: Array[A], index: Int = 0, length: Int = -1): ArraySeq[A] = {
+    val i = (index max 0) min array.length
+    val l = (length max 0) min (array.length - i)
+    if (l == 0) Empty
     else {
-      val capacity = capacitate(array.length)
+      val capacity = capacitate(l)
       val arr = scala.Array.ofDim[Any](capacity)
-      java.lang.System.arraycopy(array, 0, arr, 0, array.length)
-      createPrimary(arr, 0, array.length).toSecondary
+      java.lang.System.arraycopy(array, i, arr, 0, l)
+      createPrimary(arr, 0, l).toSecondary
     }
   }
 
@@ -556,8 +695,10 @@ object ArraySeq extends SeqFactory[ArraySeq] {
       new Secondary[A](xs.primary, start, stop, shrinkThreshold)
   }
 
+  private val MinCapacity = 8
+
   @`inline` private def isExcessive[A](xs: ArraySeq[A], start: Int, stop: Int, shrinkThreshold: Int) = {
-    xs.capacity > 8 && (capacitate(distance(start, stop)) * 100) / xs.capacity <= shrinkThreshold
+    xs.capacity > MinCapacity && (capacitate(distance(start, stop)) * 100) / xs.capacity <= shrinkThreshold
   }
 
   private[this] def pow2(n: Int): Int = {
@@ -566,7 +707,7 @@ object ArraySeq extends SeqFactory[ArraySeq] {
       pow <<= 1
     pow
   }
-  private[ArraySeq] def capacitate(n: Int): Int = pow2(n) max 8 //((((n max 8) + 7) / 8) * 8).toInt
+  private[ArraySeq] def capacitate(n: Int): Int = pow2(n) max MinCapacity
   private[ArraySeq] def allocate[A](xs: ArraySeq[A], capacity: Int): ArraySeq[A] = {
     val (frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex) = ArraySeq.indices(xs.start min xs.stop, xs.start max xs.stop, xs.capacity)
     allocate(xs, capacity, frontStartIndex, frontStopIndex, rearStartIndex, rearStopIndex)
@@ -625,7 +766,7 @@ object ArraySeq extends SeqFactory[ArraySeq] {
     case _ =>
       val builder = ArraySeq.newBuilder[A]()
       builder ++= xs
-      builder.result().withAutoShrinking()
+      builder.result()
   }
 
   /**
@@ -641,26 +782,37 @@ object ArraySeq extends SeqFactory[ArraySeq] {
     else createPrimary(xs, 0, if (length > -1) length else xs.length).toSecondary.withoutAutoShrinking
 
   /** A class to build instances of `ArraySeq`.  This builder is reusable. */
-  final class Builder[A](var sizeHint: Int = 0) extends ReusableBuilder[A, ArraySeq[A]] {
-    private var elems: ArraySeq[A] = empty
+  final class Builder[A](var sizeHint: Int = -1, val shrinkThreshold: Int = DefaultAutoShrinkThreshold) extends ReusableBuilder[A, ArraySeq[A]] {
+    private var index = 0
+    private var elems: Array[Any] = allocate()
 
-    private def empty = createPrimary(scala.Array.ofDim[Any](capacitate(sizeHint max 0)), 0, 0).toSecondary.withoutAutoShrinking
+    private def allocate(size: Int = sizeHint) = scala.Array.ofDim[Any](capacitate(size max 32))
+
+    override def clear() = elems = allocate()
 
     override def sizeHint(size: Int) = sizeHint = size
 
-    override def clear() = elems = empty
-
-    override def result() = elems
+    override def result() =
+      if (index == 0) Empty
+      else ArraySeq.createPrimary[A](elems, 0, index).withAutoShrinking(shrinkThreshold)
 
     override def add(elem: A) = {
-      elems :+= elem
+      if (elems.length == index) {
+        val array = allocate(index + 1)
+        java.lang.System.arraycopy(elems, 0, array, 0, index)
+        elems = array
+      }
+      elems(index) = elem
+      index += 1
       this
     }
   }
 
   def newBuilder[A](): Builder[A] = new Builder[A]()
 
-  def newBuilder[A](sizeHint: Int): Builder[A] = new Builder[A](sizeHint)
+  def newSizedBuilder[A](sizeHint: Int): Builder[A] = new Builder[A](sizeHint)
+
+  def newSpecificBuilder[A](sizeHint: Int = -1, shrinkThreshold: Int = DefaultAutoShrinkThreshold): Builder[A] = new Builder[A](sizeHint = sizeHint, shrinkThreshold = shrinkThreshold)
 
   override def empty[A <: Any]: ArraySeq[A] = Empty
 
