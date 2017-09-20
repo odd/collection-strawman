@@ -1,7 +1,6 @@
 package strawman
 package collection
 package immutable
-package test
 
 import org.junit.Assert._
 import org.junit.Test
