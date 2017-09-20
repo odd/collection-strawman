@@ -20,7 +20,7 @@ class ArrayOps[A](val xs: Array[A])
 
   def length = xs.length
   @throws[ArrayIndexOutOfBoundsException]
-  def apply(i: Int) = xs.apply(i)
+  def apply(i: Int): A = xs.apply(i)
 
   override def view = ArrayView(xs)
 
@@ -56,9 +56,9 @@ class ArrayOps[A](val xs: Array[A])
 
 }
 
-case class ArrayView[A](xs: Array[A]) extends IndexedView[A] {
+case class ArrayView[A](xs: Array[A]) extends IndexedSeqView[A] {
   def length = xs.length
   @throws[ArrayIndexOutOfBoundsException]
-  def apply(n: Int) = xs(n)
+  override def apply(n: Int): A = xs(n)
   override def className = "ArrayView"
 }

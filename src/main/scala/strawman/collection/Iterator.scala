@@ -772,9 +772,9 @@ object Iterator {
     def next() = if (consumed) empty.next() else { consumed = true; a }
   }
 
-  def apply[A](xs: A*): Iterator[A] = new IndexedView[A] {
+  def apply[A](xs: A*): Iterator[A] = new IndexedSeqView[A] {
     val length = xs.length
-    def apply(n: Int) = xs(n)
+    override def apply(n: Int): A = xs(n)
   }.iterator()
 
   /** Creates iterator that produces the results of some element computation a number of times.

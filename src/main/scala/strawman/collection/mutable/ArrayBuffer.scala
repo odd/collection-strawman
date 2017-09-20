@@ -152,9 +152,9 @@ object ArrayBuffer extends SeqFactory[ArrayBuffer] {
   def empty[A]: ArrayBuffer[A] = new ArrayBuffer[A]()
 }
 
-class ArrayBufferView[A](val array: Array[AnyRef], val length: Int) extends IndexedView[A] {
+class ArrayBufferView[A](val array: Array[AnyRef], val length: Int) extends IndexedSeqView[A] {
   @throws[ArrayIndexOutOfBoundsException]
-  def apply(n: Int) = array(n).asInstanceOf[A]
+  override def apply(n: Int) = array(n).asInstanceOf[A]
   override def className = "ArrayBufferView"
 }
 

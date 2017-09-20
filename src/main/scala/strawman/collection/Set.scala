@@ -142,34 +142,22 @@ trait SetOps[A, +CC[_], +C <: SetOps[A, CC, C]]
   /** Alias for `diff` */
   @`inline` final def &~ (that: Set[A]): C = this diff that
 
-  /** Creates a new $coll by adding all elements contained in another collection to this $coll, omitting duplicates.
-    *
-    * This method takes a collection of elements and adds all elements, omitting duplicates, into $coll.
-    *
-    * Example:
-    *  {{{
-    *    scala> val a = Set(1, 2) concat Set(2, 3)
-    *    a: scala.collection.immutable.Set[Int] = Set(1, 2, 3)
-    *  }}}
-    *
-    *  @param that     the collection containing the elements to add.
-    *  @return a new $coll with the given elements added, omitting duplicates.
-    */
-  def concat(that: collection.Iterable[A]): C = fromSpecificIterable(View.Concat(toIterable, that))
+  /** Alias for `union` */
+  @`inline` final def concat(that: collection.Iterable[A]): C = union(that)
 
   /** Alias for `concat` */
-  @`inline` final def ++ (that: collection.Iterable[A]): C = concat(that)
+  @`inline` final def ++ (that: collection.Iterable[A]): C = union(that)
 
-  /** Computes the union between of set and another set.
+  /** Computes the union between a set and another iterable.
     *
-    *  @param   that  the set to form the union with.
+    *  @param   that  the iterable to form the union with.
     *  @return  a new set consisting of all elements that are in this
-    *  set or in the given set `that`.
+    *  set or in the given iterable `that`.
     */
-  @`inline` final def union(that: collection.Iterable[A]): C = concat(that)
+  def union(that: collection.Iterable[A]): C = fromSpecificIterable(View.Union(toIterable, that))
 
   /** Alias for `union` */
-  @`inline` final def | (that: collection.Iterable[A]): C = concat(that)
+  @`inline` final def | (that: collection.Iterable[A]): C = union(that)
 
   /** The empty set of the same type as this set
     * @return  an empty set of type `C`.

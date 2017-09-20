@@ -36,7 +36,7 @@ trait SetOps[A, +CC[X], +C <: SetOps[A, CC, C]]
   /** Alias for `excl` */
   @`inline` final def - (elem: A): C = excl(elem)
 
-  override def concat(that: collection.Iterable[A]): C = {
+  override def union(that: collection.Iterable[A]): C = {
     var result: C = coll
     val it = that.iterator()
     while (it.hasNext) result = result + it.next()
@@ -45,7 +45,6 @@ trait SetOps[A, +CC[X], +C <: SetOps[A, CC, C]]
 
   def diff(that: collection.Set[A]): C =
     toIterable.foldLeft(empty)((result, elem) => if (that contains elem) result else result + elem)
-
 }
 
 object Set extends IterableFactory[Set] {

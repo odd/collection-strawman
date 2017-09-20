@@ -1,6 +1,6 @@
 package strawman.collection
 
-import scala.{Any, AnyRef, Array, Boolean, Equals, IndexOutOfBoundsException, Int, NoSuchElementException, Ordering, Unit, math, throws}
+import scala.{Any, AnyRef, Array, Boolean, Equals, IndexOutOfBoundsException, Int, NoSuchElementException, Ordering, Unit, math, throws, `inline`}
 import scala.Predef.{identity, intWrapper}
 import java.lang.Object
 
@@ -23,12 +23,20 @@ object Seq extends SeqFactory.Delegate[Seq](immutable.Seq)
 trait SeqOps[+A, +CC[X], +C] extends Any
   with IterableOps[A, CC, C]
   with ArrayLike[A]
-  with Equals {
+  with Equals { self =>
 
   /**
     * @return This collection as a `Seq[A]`. This is equivalent to `to(Seq)` but might be faster.
     */
   def toSeq: Seq[A]
+
+  /** A view representing the elements of this `Seq`. */
+  override def view: SeqView[A] = new SeqView[A] {
+    override def length = self.length
+    override def apply(i: Int) = self(i)
+    override def iterator() = self.toIterable.iterator()
+  }
+
 
   /** A copy of the $coll with an element prepended.
     *
@@ -56,7 +64,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     *    @return a new $coll consisting of `value` followed
     *            by all elements of this $coll.
     */
-  def prepended[B >: A](elem: B): CC[B] = fromIterable(View.Prepend(elem, toIterable))
+  def prepended[B >: A](elem: B): CC[B] = fromIterable(SeqView.Prepend(elem, toSeq))
 
   /** Alias for `prepended`.
     *
@@ -91,7 +99,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     *    @return a new $coll consisting of
     *            all elements of this $coll followed by `value`.
     */
-  def appended[B >: A](elem: B): CC[B] = fromIterable(View.Append(toIterable, elem))
+  def appended[B >: A](elem: B): CC[B] = fromIterable(SeqView.Append(toSeq, elem))
 
   /** Alias for `appended`
     *
@@ -130,7 +138,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     *    @return       a new $coll which contains all elements of `prefix` followed
     *                  by all the elements of this $coll.
     */
-  def prependedAll[B >: A](prefix: Iterable[B]): CC[B] = fromIterable(View.Concat(prefix, toIterable))
+  def prependedAll[B >: A](prefix: Iterable[B]): CC[B] = fromIterable(SeqView.PrependAll(prefix, toSeq))
 
   /** Alias for `prependedAll` */
   @`inline` final def ++: [B >: A](prefix: Iterable[B]): CC[B] = prependedAll(prefix)
@@ -144,11 +152,13 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     *  @return       a new collection of type `CC[B]` which contains all elements
     *                of this $coll followed by all elements of `suffix`.
     */
-  def appendedAll[B >: A](suffix: Iterable[B]): CC[B] = concat(suffix)
+  def appendedAll[B >: A](suffix: Iterable[B]): CC[B] = fromIterable(SeqView.AppendAll(toSeq, suffix))
 
   /** Alias for `appendedAll` */
   @`inline` final def :++ [B >: A](suffix: Iterable[B]): CC[B] = appendedAll(suffix)
 
+  /** Alias for `appendedAll` */
+  @`inline` final override def concat [B >: A](suffix: Iterable[B]): CC[B] = appendedAll(suffix)
 
   /** Selects all the elements of this $coll ignoring the duplicates.
     *
@@ -163,7 +173,7 @@ trait SeqOps[+A, +CC[X], +C] extends Any
     * @tparam B the type of the elements after being transformed by `f`
     * @return a new $coll consisting of all the elements of this $coll without duplicates.
     */
-  def distinctBy[B](f: A => B): C = fromSpecificIterable(new View.DistinctBy(toIterable, f))
+  def distinctBy[B](f: A => B): C = fromSpecificIterable(View.DistinctBy(toIterable, f))
 
   /** Returns new $coll with elements in reversed order.
    *
@@ -698,22 +708,22 @@ object SeqOps {
    *  @param  n1   The far end of the target sequence that we should use (exclusive)
    *  @return Target packed in an IndexedSeq (taken from iterator unless W already is an IndexedSeq)
    */
-  private def kmpOptimizeWord[B](W: Seq[B], n0: Int, n1: Int, forward: Boolean): IndexedView[B] = W match {
+  private def kmpOptimizeWord[B](W: Seq[B], n0: Int, n1: Int, forward: Boolean): IndexedSeqView[B] = W match {
     case iso: IndexedSeq[B] =>
       // Already optimized for indexing--use original (or custom view of original)
       if (forward && n0==0 && n1==W.length) iso.view
-      else if (forward) new IndexedView[B] {
+      else if (forward) new IndexedSeqView[B] {
         val length = n1 - n0
-        def apply(x: Int) = iso(n0 + x)
+        override def apply(x: Int): B = iso(n0 + x)
       }
-      else new IndexedView[B] {
+      else new IndexedSeqView[B] {
         def length = n1 - n0
-        def apply(x: Int) = iso(n1 - 1 - x)
+        override def apply(x: Int): B = iso(n1 - 1 - x)
       }
     case _ =>
       // W is probably bad at indexing.  Pack in array (in correct orientation)
       // Would be marginally faster to special-case each direction
-      new IndexedView[B] {
+      new IndexedSeqView[B] {
         private[this] val Warr = new Array[AnyRef](n1-n0)
         private[this] val delta = if (forward) 1 else -1
         private[this] val done = if (forward) n1-n0 else -1
@@ -725,7 +735,7 @@ object SeqOps {
         }
 
         val length = n1 - n0
-        def apply(x: Int) = Warr(x).asInstanceOf[B]
+        override def apply(x: Int): B = Warr(x).asInstanceOf[B]
       }
   }
 
@@ -737,7 +747,7 @@ object SeqOps {
    *  @param  wlen Just in case we're only IndexedSeq and not IndexedSeqOptimized
    *  @return KMP jump table for target sequence
    */
- private def kmpJumpTable[B](Wopt: IndexedView[B], wlen: Int) = {
+ private def kmpJumpTable[B](Wopt: IndexedSeqView[B], wlen: Int) = {
     val arr = new Array[Int](wlen)
     var pos = 2
     var cnd = 0

@@ -184,7 +184,7 @@ final class Vector[+A] private[immutable] (private[collection] val startIndex: I
 
   override def splitAt(n: Int): (Vector[A], Vector[A]) = (take(n), drop(n))
 
-  // appendAll (suboptimal but avoids worst performance gotchas)
+  // appendedAll (suboptimal but avoids worst performance gotchas)
   override def appendedAll[B >: A](suffix: collection.Iterable[B]): Vector[B] = {
     import Vector.{Log2ConcatFaster, TinyAppendFaster}
     if (suffix.isEmpty) this

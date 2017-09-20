@@ -9,12 +9,12 @@ import scala.Predef.{<:<, intWrapper}
 trait View[+A] extends Iterable[A] with IterableOps[A, View, View[A]] {
   override def view = this
 
-  def iterableFactory = View
+  def iterableFactory: IterableFactoryLike[View] = View
 
   protected[this] def fromSpecificIterable(coll: Iterable[A]): View[A] = fromIterable(coll)
 
   protected[this] def newSpecificBuilder(): Builder[A, View[A]] =
-    immutable.IndexedSeq.newBuilder().mapResult(_.view)
+    IndexedSeq.newBuilder().mapResult(_.view)
 
   final protected[this] def coll: this.type = this
 
@@ -99,13 +99,13 @@ object View extends IterableFactoryLike[View] {
   }
 
   /** A view containing values of a given function over a range of integer values starting from 0. */
-  class Tabulate[A](n: Int)(f: Int => A) extends View[A] {
+  case class Tabulate[A](n: Int)(f: Int => A) extends View[A] {
     def iterator(): Iterator[A] = Iterator.tabulate(n)(f)
     override def knownSize: Int = 0 max n
   }
 
   /** A view containing repeated applications of a function to a start value */
-  class Iterate[A](start: A, len: Int)(f: A => A) extends View[A] {
+  case class Iterate[A](start: A, len: Int)(f: A => A) extends View[A] {
     def iterator(): Iterator[A] = Iterator.iterate(start)(f).take(len)
     override def knownSize: Int = 0 max len
   }
@@ -138,12 +138,12 @@ object View extends IterableFactoryLike[View] {
     /** The view consisting of all elements of the underlying collection
      *  that satisfy `p`.
      */
-    val first = Partitioned(this, true)
+    val first = Partitioned(this, cond = true)
 
     /** The view consisting of all elements of the underlying collection
      *  that do not satisfy `p`.
      */
-    val second = Partitioned(this, false)
+    val second = Partitioned(this, cond = false)
   }
 
   /** A view representing one half of a partition. */
@@ -207,24 +207,18 @@ object View extends IterableFactoryLike[View] {
       else -1
   }
 
+  /** A view that Computes the union between a set and another set.
+   */
+  case class Union[A](prefix: Iterable[A], suffix: Iterable[A]) extends View[A] {
+    def iterator() = prefix.iterator() ++ suffix.iterator()
+  }
+
   /** A view that zips elements of the underlying collection with the elements
    *  of another collection or iterator.
    */
   case class Zip[A, B](underlying: Iterable[A], other: Iterable[B]) extends View[(A, B)] {
     def iterator() = underlying.iterator().zip(other)
     override def knownSize = underlying.knownSize min other.knownSize
-  }
-
-  /** A view that appends an element to its elements */
-  case class Append[A](underlying: Iterable[A], elem: A) extends View[A] {
-    def iterator(): Iterator[A] = Concat(underlying, View.Single(elem)).iterator()
-    override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize + 1 else -1
-  }
-
-  /** A view that prepends an element to its elements */
-  case class Prepend[A](elem: A, underlying: Iterable[A]) extends View[A] {
-    def iterator(): Iterator[A] = Concat(View.Single(elem), underlying).iterator()
-    override def knownSize: Int = if (underlying.knownSize >= 0) underlying.knownSize + 1 else -1
   }
 
   case class Updated[A](underlying: Iterable[A], index: Int, elem: A) extends View[A] {
@@ -241,9 +235,12 @@ object View extends IterableFactoryLike[View] {
     override def knownSize: Int = underlying.knownSize
   }
 
-  private[collection] class Patched[A](underlying: Iterable[A], from: Int, other: IterableOnce[A], replaced: Int) extends View[A] {
+  case class Patched[A] private[collection] (underlying: Iterable[A], from: Int, other: IterableOnce[A], replaced: Int) extends View[A] {
     if (from < 0 || (knownSize > -1 && from > knownSize)) throw new IndexOutOfBoundsException(from.toString)
     def iterator(): Iterator[A] = underlying.iterator().patch(from, other.iterator(), replaced)
+  }
+  object Patched {
+    def apply[A](underlying: Iterable[A], from: Int, other: Iterable[A], replaced: Int) = new Patched[A](underlying, from, other, replaced)
   }
 
   case class ZipWithIndex[A](underlying: Iterable[A]) extends View[(A, Int)] {
@@ -290,22 +287,93 @@ trait ArrayLike[+A] extends Any {
   def apply(i: Int): A
 }
 
+trait SeqView[+A] extends View[A] with SeqOps[A, SeqView, SeqView[A]] { self =>
+  override def view: SeqView[A] = this
+
+  override def toSeq = immutable.IndexedSeq.from(this)
+
+  override def iterableFactory: IterableFactoryLike[SeqView] = SeqView
+
+  override protected[this] def fromSpecificIterable(coll: Iterable[A]): SeqView[A] = fromIterable(coll)
+
+  override protected[this] def newSpecificBuilder(): Builder[A, SeqView[A]] =
+    IndexedSeq.newBuilder().mapResult(_.view)
+
+  override def toString = "SeqView(?)"
+  override def className = "SeqView"
+
+  override def apply(i: Int) = iterator().drop(i - 1).next()
+  override def prepended[B >: A](elem: B): SeqView[B] = SeqView.Prepend(elem, this)
+  override def appended[B >: A](elem: B): SeqView[B] = SeqView.Append(this, elem)
+  override def prependedAll[B >: A](prefix: Iterable[B]): SeqView[B] = SeqView.PrependAll(prefix, this)
+  override def appendedAll[B >: A](suffix: Iterable[B]): SeqView[B] = SeqView.AppendAll(this, suffix)
+}
+
+object SeqView extends SeqFactory[SeqView] {
+  def fromIterator[A](it: => Iterator[A]): SeqView[A] = new SeqView[A] {
+    override def length = it.size
+    override def apply(i: Int) = it.drop(i - 1).next()
+    def iterator() = it
+  }
+
+  /** Avoid copying if source collection is already a view. */
+  def from[E](it: Source[E]): SeqView[E] = it match {
+    case it: SeqView[E] => it
+    case _ => SeqView.fromIterator(it.iterator())
+  }
+
+  def empty[A]: SeqView[A] = Empty
+
+  /** The empty `SeqView` */
+  case object Empty extends SeqView[Nothing] {
+    override def length = 0
+    def iterator() = Iterator.empty
+    override def knownSize = 0
+  }
+
+  def newBuilder[A](): Builder[A, SeqView[A]] = ArrayBuffer.newBuilder[A]().mapResult(from)
+
+  /** A view that appends an element to its elements */
+  case class Append[A](underlying: Iterable[A] with ArrayLike[A], elem: A) extends SeqView[A] {
+    override def length: Int = underlying.length + 1
+    override def knownSize: Int = length
+    def iterator(): Iterator[A] = View.Concat(underlying, View.Single(elem)).iterator()
+  }
+
+  /** A view that prepends an element to its elements */
+  case class Prepend[A](elem: A, underlying: Iterable[A] with ArrayLike[A]) extends SeqView[A] {
+    override def length: Int = underlying.length + 1
+    override def knownSize: Int = length
+    def iterator(): Iterator[A] = View.Concat(View.Single(elem), underlying).iterator()
+  }
+
+  /** A view that appends a collection of elements to its elements */
+  case class AppendAll[A](underlying: Iterable[A] with ArrayLike[A], suffix: Iterable[A]) extends SeqView[A] {
+    override val length = underlying.length + suffix.size
+    def iterator(): Iterator[A] = underlying.iterator() ++ suffix.iterator()
+    override def knownSize: Int = length
+  }
+
+  /** A view that prepends an element to its elements */
+  case class PrependAll[A](prefix: Iterable[A], underlying: Iterable[A] with ArrayLike[A]) extends SeqView[A] {
+    override val length = prefix.size + underlying.length
+    def iterator(): Iterator[A] = prefix.iterator() ++ underlying.iterator()
+    override def knownSize: Int = length
+  }
+}
+
 /** View defined in terms of indexing a range */
-trait IndexedView[+A] extends View[A] with ArrayLike[A] with SeqOps[A, View, IndexedView[A]] { self =>
+trait IndexedSeqView[+A] extends SeqView[A] with IndexedSeqOps[A, IndexedSeqView, IndexedSeqView[A]] { self =>
+  override def view: IndexedSeqView[A] = this
 
-  final def toSeq: Seq[A] = to(IndexedSeq)
+  override def iterableFactory: SeqFactory[IndexedSeqView] = IndexedSeqView
 
-  override protected[this] def fromSpecificIterable(it: Iterable[A]): IndexedView[A] =
-    it match {
-      case v: IndexedView[A] => v
-      case i: IndexedSeq[A] => i.view
-      case _ => it.to(IndexedSeq).view
-    }
+  override protected[this] def fromSpecificIterable(coll: Iterable[A]): IndexedSeqView[A] = fromIterable(coll)
 
-  override protected[this] def newSpecificBuilder(): Builder[A, IndexedView[A]] =
+  override protected[this] def newSpecificBuilder(): Builder[A, IndexedSeqView[A]] =
     IndexedSeq.newBuilder[A]().mapResult(_.view)
 
-  def iterator(): Iterator[A] = new Iterator[A] {
+  override def iterator(): Iterator[A] = new Iterator[A] {
     private var current = 0
     def hasNext = current < self.length
     def next(): A = {
@@ -315,55 +383,82 @@ trait IndexedView[+A] extends View[A] with ArrayLike[A] with SeqOps[A, View, Ind
     }
   }
 
+  override def toString = "IndexedSeqView(?)"
+  override def className = "IndexedSeqView"
+
   override def knownSize: Int = length
 
-  override def take(n: Int): IndexedView[A] = new IndexedView.Take(this, n)
-  override def takeRight(n: Int): IndexedView[A] = new IndexedView.TakeRight(this, n)
-  override def drop(n: Int): IndexedView[A] = new IndexedView.Drop(this, n)
-  override def dropRight(n: Int): IndexedView[A] = new IndexedView.DropRight(this, n)
-  override def map[B](f: A => B): IndexedView[B] = new IndexedView.Map(this, f)
-  override def reverse: IndexedView[A] = IndexedView.Reverse(this)
+  override def apply(i: Int): A // make abstract to force override in implementors
+
+  override def take(n: Int): IndexedSeqView[A] = IndexedSeqView.Take(this, n)
+  override def takeRight(n: Int): IndexedSeqView[A] = IndexedSeqView.TakeRight(this, n)
+  override def drop(n: Int): IndexedSeqView[A] = IndexedSeqView.Drop(this, n)
+  override def dropRight(n: Int): IndexedSeqView[A] = IndexedSeqView.DropRight(this, n)
+  override def map[B](f: A => B): IndexedSeqView[B] = IndexedSeqView.Map(this, f)
+  override def reverse: IndexedSeqView[A] = IndexedSeqView.Reverse(this)
 }
 
-object IndexedView {
+object IndexedSeqView extends SeqFactory[IndexedSeqView] {
 
-  class Take[A](underlying: IndexedView[A], n: Int) extends IndexedView[A] {
+  def fromIterator[A](it: => Iterator[A]): IndexedSeqView[A] = new IndexedSeqView[A] {
+    override def length = it.length
+    override def apply(i: Int) = it.drop(i - 1).next()
+  }
+
+  /** Avoid copying if source collection is already a view. */
+  def from[E](it: Source[E]): IndexedSeqView[E] = it match {
+    case it: IndexedSeqView[E] => it
+    case it: IndexedSeq[E] => it.view
+    case _ => IndexedSeqView.fromIterator(it.iterator())
+  }
+
+  def empty[A]: IndexedSeqView[A] = Empty
+
+  /** The empty `IndexedSeqView` */
+  case object Empty extends IndexedSeqView[Nothing] {
+    override def length = 0
+    override def apply(i: Int) = throw new NoSuchElementException("apply of empty indexed seq")
+  }
+
+  def newBuilder[A](): Builder[A, IndexedSeqView[A]] = ArrayBuffer.newBuilder[A]().mapResult(from)
+
+  case class Take[A](underlying: IndexedSeqView[A], n: Int) extends IndexedSeqView[A] {
     private[this] val normN = n max 0
     def length = underlying.length min normN
     @throws[IndexOutOfBoundsException]
-    def apply(i: Int) = underlying.apply(i)
+    override def apply(i: Int) = underlying.apply(i)
   }
 
-  class TakeRight[A](underlying: IndexedView[A], n: Int) extends IndexedView[A] {
+  case class TakeRight[A](underlying: IndexedSeqView[A], n: Int) extends IndexedSeqView[A] {
     private[this] val delta = (underlying.length - (n max 0)) max 0
     def length = underlying.length - delta
     @throws[IndexOutOfBoundsException]
-    def apply(i: Int) = underlying.apply(i + delta)
+    override def apply(i: Int) = underlying.apply(i + delta)
   }
 
-  class Drop[A](underlying: IndexedView[A], n: Int) extends IndexedView[A] {
+  case class Drop[A](underlying: IndexedSeqView[A], n: Int) extends IndexedSeqView[A] {
     protected val normN = n max 0
     def length = (underlying.length - normN) max 0
     @throws[IndexOutOfBoundsException]
-    def apply(i: Int) = underlying.apply(i + normN)
+    override def apply(i: Int) = underlying.apply(i + normN)
   }
 
-  class DropRight[A](underlying: IndexedView[A], n: Int) extends IndexedView[A] {
+  case class DropRight[A](underlying: IndexedSeqView[A], n: Int) extends IndexedSeqView[A] {
     private[this] val len = (underlying.length - (n max 0)) max 0
     def length = len
     @throws[IndexOutOfBoundsException]
-    def apply(i: Int) = underlying.apply(i)
+    override def apply(i: Int) = underlying.apply(i)
   }
 
-  class Map[A, B](underlying: IndexedView[A], f: A => B) extends IndexedView[B] {
+  case class Map[A, B](underlying: IndexedSeqView[A], f: A => B) extends IndexedSeqView[B] {
     def length = underlying.length
     @throws[IndexOutOfBoundsException]
-    def apply(n: Int) = f(underlying.apply(n))
+    override def apply(n: Int) = f(underlying.apply(n))
   }
 
-  case class Reverse[A](underlying: IndexedView[A]) extends IndexedView[A] {
+  case class Reverse[A](underlying: IndexedSeqView[A]) extends IndexedSeqView[A] {
     def length = underlying.length
     @throws[IndexOutOfBoundsException]
-    def apply(i: Int) = underlying.apply(length - 1 - i)
+    override def apply(i: Int) = underlying.apply(length - 1 - i)
   }
 }

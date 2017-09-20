@@ -68,10 +68,10 @@ class StringOps(val s: String)
   def ++(xs: String): String = s + xs
 }
 
-case class StringView(s: String) extends IndexedView[Char] {
+case class StringView(s: String) extends IndexedSeqView[Char] {
   def length = s.length
   @throws[StringIndexOutOfBoundsException]
-  def apply(n: Int) = s.charAt(n)
+  override def apply(n: Int): Char = s.charAt(n)
   override def className = "StringView"
 }
 
