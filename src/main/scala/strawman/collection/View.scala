@@ -310,16 +310,30 @@ trait SeqView[+A] extends View[A] with SeqOps[A, SeqView, SeqView[A]] { self =>
 }
 
 object SeqView extends SeqFactory[SeqView] {
-  def fromIterator[A](it: => Iterator[A]): SeqView[A] = new SeqView[A] {
-    override def length = it.size
-    override def apply(i: Int) = it.drop(i - 1).next()
-    def iterator() = it
+  /**
+    * @return A `SeqView[A]` whose underlying iterator is provided by the `it` parameter-less function.
+    *
+    * @param it Function creating the iterator to be used by the view. This function must always return
+    *           a fresh `Iterator`, otherwise the resulting view will be effectively iterable only once.
+    *
+    * @tparam A View element type
+    */
+  def fromIteratorProvider[A](it: () => Iterator[A]): SeqView[A] = new SeqView[A] {
+    override def length = it().size
+    def iterator() = it()
   }
 
-  /** Avoid copying if source collection is already a view. */
+  /**
+    * @return A seq view iterating over the given `Iterable`
+    *
+    * @param it The `Iterable` to view. It must be an `Iterable` (and not just an `IterableOnce`),
+    *           otherwise an `IllegalArgumentException` is thrown.
+    *
+    * @tparam E View element type
+    */
   def from[E](it: Source[E]): SeqView[E] = it match {
     case it: SeqView[E] => it
-    case _ => SeqView.fromIterator(it.iterator())
+    case _ => SeqView.fromIteratorProvider(() => it.iterator())
   }
 
   def empty[A]: SeqView[A] = Empty
