@@ -414,16 +414,30 @@ trait IndexedSeqView[+A] extends SeqView[A] with IndexedSeqOps[A, IndexedSeqView
 
 object IndexedSeqView extends SeqFactory[IndexedSeqView] {
 
-  def fromIterator[A](it: => Iterator[A]): IndexedSeqView[A] = new IndexedSeqView[A] {
-    override def length = it.length
-    override def apply(i: Int) = it.drop(i - 1).next()
+  /**
+    * @return A `IndexedSeqView[A]` whose underlying iterator is provided by the `it` parameter-less function.
+    *
+    * @param it Function creating the iterator to be used by the view. This function must always return
+    *           a fresh `Iterator`, otherwise the resulting view will be effectively iterable only once.
+    *
+    * @tparam A View element type
+    */
+  def fromIteratorProvider[A](it: () => Iterator[A]): IndexedSeqView[A] = new IndexedSeqView[A] {
+    override def length = it().size
+    override def apply(i: Int) = it().drop(i - 1).next()
   }
 
-  /** Avoid copying if source collection is already a view. */
+  /**
+    * @return An indexed seq view iterating over the given `Iterable`
+    *
+    * @param it The `Iterable` to view. It must be an `Iterable` (and not just an `IterableOnce`),
+    *           otherwise an `IllegalArgumentException` is thrown.
+    *
+    * @tparam E View element type
+    */
   def from[E](it: Source[E]): IndexedSeqView[E] = it match {
     case it: IndexedSeqView[E] => it
-    case it: IndexedSeq[E] => it.view
-    case _ => IndexedSeqView.fromIterator(it.iterator())
+    case _ => IndexedSeqView.fromIteratorProvider(() => it.iterator())
   }
 
   def empty[A]: IndexedSeqView[A] = Empty
