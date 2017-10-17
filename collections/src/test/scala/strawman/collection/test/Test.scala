@@ -6,7 +6,7 @@ import java.lang.String
 import scala.{Any, Array, Boolean, Char, Either, Int, Left, Nothing, Option, StringContext, Unit}
 import scala.Predef.{assert, charWrapper, identity, println}
 import collection._
-import collection.immutable.{ImmutableArray, LazyList, List, Nil, Range, Vector}
+import collection.immutable.{ImmutableArray, LazyList, List, Nil, Range, Vector, ArraySeq}
 import collection.mutable.{ArrayBuffer, ListBuffer}
 import org.junit.Test
 
@@ -269,6 +269,48 @@ class StrawmanTest {
     println(xs17.view)
   }
 
+  def arraySeqOps(xs: ArraySeq[Int]): Unit = {
+    val x1 = xs.foldLeft("")(_ + _)
+    val y1: String = x1
+    val x2 = xs.foldRight("")(_ + _)
+    val y2: String = x2
+    val x3 = xs.indexWhere(_ % 2 == 0)
+    val y3: Int = x3
+    val x4 = xs.head
+    val y4: Int = x4
+    val x5 = xs.to(List)
+    val y5: List[Int] = x5
+    val (xs6, xs7) = xs.partition(_ % 2 == 0)
+    val ys6: ArraySeq[Int] = xs6
+    val ys7: ArraySeq[Int] = xs7
+    val xs8 = xs.drop(2)
+    val ys8: ArraySeq[Int] = xs8
+    val xs10 = xs.flatMap(x => List(x, -x))
+    val ys10: ArraySeq[Int] = xs10
+    val xs11 = xs ++ xs
+    val ys11: ArraySeq[Int] = xs11
+    val xs13 = Nil ++ xs
+    val ys13: List[Int] = xs13
+    val xs14 = xs ++ (("a": Any) :: Nil)
+    val ys14: ArraySeq[Any] = xs14
+    val xs16 = xs.reverse
+    val ys16: ArraySeq[Int] = xs16
+    println("-ARRAYSEQ------")
+    println(x1)
+    println(x2)
+    println(x3)
+    println(x4)
+    println(x5)
+    println(xs6.view)
+    println(xs7.view)
+    println(xs8.view)
+    println(xs10.view)
+    println(xs11.view)
+    println(xs13)
+    println(xs14.view)
+    println(xs16.view)
+  }
+
   def immutableSeqOps(xs: immutable.Seq[Int]): Unit = {
     val xs1 = xs :+ 42
     assert(xs1 == (xs ++ immutable.Seq(42)))
@@ -466,6 +508,22 @@ class StrawmanTest {
     assert(lazeCountS==lazeCountL)
   }
 
+  def equality(): Unit = {
+    val list: Iterable[Int] = List(1, 2, 3)
+    val lazyList: Iterable[Int] = LazyList(1, 2, 3)
+    val buffer = ArrayBuffer(1, 2, 3)
+    val range = Range.inclusive(1, 3)
+    assert(list == lazyList)
+    assert(list.## == lazyList.##)
+    assert(list == (buffer: Iterable[Int]))
+    assert(list.## == buffer.##)
+    assert(list == (range: Iterable[Int]))
+    assert(list.## == range.##)
+    buffer += 4
+    assert(list != (buffer: Iterable[Int]))
+    assert(list.## != buffer.##)
+  }
+
   def sortedSets(xs: immutable.SortedSet[Int]): Unit = {
     iterableOps(xs)
     val xs1 = xs.map((x: Int) => x.toString) // TODO Remove type annotation when https://github.com/scala/scala/pull/5708 is published
@@ -574,6 +632,8 @@ class StrawmanTest {
     immutableSeqOps(intsArr)
     immutableArrayOps(intsArr)
     lazyListOps(intsLzy)
+    arraySeqOps(ArraySeq(1, 2, 3))
+    equality()
     distinct()
     linearSeqSize()
   }

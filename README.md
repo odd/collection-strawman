@@ -151,6 +151,7 @@ For more information, see the [CONTRIBUTING](CONTRIBUTING.md) file.
 - [ ] `EqSet`
 - [x] `BitSet`
 - [x] `View`
+- [x] `ArraySeq` (new immutable indexed sequence)
 
 ## Implemented operations (on the relevant collection types)
 
@@ -216,10 +217,11 @@ For more information, see the [CONTRIBUTING](CONTRIBUTING.md) file.
 
 - [x] `combinations`
 - [x] `updated`
-- [x] `prepend`
-- [x] `append`
+- [x] `+:` / `prepend`
+- [x] `:+` / `append`
 - [x] `++` / `concat` / `union`
 - [x] `++:` / `prependAll`
+- [x] `:++` / `appendAll`
 - [x] `flatMap`
 - [x] `grouped`
 - [x] `keys` / `keySet` / `keysIterator`

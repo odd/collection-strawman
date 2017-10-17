@@ -1,4 +1,6 @@
-package strawman.collection.immutable
+package strawman
+package collection
+package immutable
 
 import java.util.concurrent.TimeUnit
 
@@ -6,7 +8,7 @@ import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.{Any, AnyRef, Int, Long, Unit, math}
-import scala.Predef.intWrapper
+import scala.Predef.{intWrapper, longWrapper}
 
 @BenchmarkMode(scala.Array(Mode.AverageTime))
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -15,27 +17,98 @@ import scala.Predef.intWrapper
 @Measurement(iterations = 12)
 @State(Scope.Benchmark)
 class ListBenchmark {
-  @Param(scala.Array("0", "1", "2", "3", "4", "7", "8", "15", "16", "17", "39", "282", "4096", "131070", "7312102"))
+  //@Param(scala.Array("0", "1"/*, "2", "3", "4"*/, "7", "8"/*, "15"*/, "16", "17", "39"/*, "282", "4096", "131070", "7312102"*/))
+  @Param(scala.Array(/*"0", */"1"/*, "2", "3", "4", "7"*/, "8"/*, "15", "16"*/, "17"/*, "39"*/, "282", "4096", "73121", "7312102"))
   var size: Int = _
 
+  val random = new scala.util.Random(19740115L)
   var xs: List[Long] = _
+  var ys: List[Long] = _
   var zs: List[Long] = _
   var zipped: List[(Long, Long)] = _
   var randomIndices: scala.Array[Int] = _
   def fresh(n: Int) = List((1 to n).map(_.toLong): _*)
+  def freshBuilder() = List.newBuilder[Long]()
 
   @Setup(Level.Trial)
   def initTrial(): Unit = {
     xs = fresh(size)
+    val xsl = xs.splitAt(size / 2)._1
+    ys = xsl ++ xsl.reverse
     zs = fresh((size / 1000) max 2).map(-_)
     zipped = xs.map(x => (x, x))
     if (size > 0) {
-      randomIndices = scala.Array.fill(1000)(scala.util.Random.nextInt(size))
+      randomIndices = scala.Array.fill(1000)(random.nextInt(size))
     }
   }
 
   @Benchmark
-  def create(bh: Blackhole): Unit = bh.consume(fresh(size))
+  def create_apply(bh: Blackhole): Unit = bh.consume(fresh(size))
+
+  @Benchmark
+  def create_build(bh: Blackhole): Unit = {
+    var i = 0L
+    val builder = freshBuilder()
+    builder.sizeHint(size)
+    while (i < size) {
+      builder += i
+      i += 1
+    }
+    bh.consume(builder.result())
+  }
+
+  @Benchmark
+  def create_buildRange(bh: Blackhole): Unit = {
+    var i = 0L
+    val builder = freshBuilder()
+    builder.sizeHint(size * 10)
+    while (i < size) {
+      builder ++= xs.iterableFactory.range(i - 10, i)
+      i += 1
+    }
+    bh.consume(builder.result())
+  }
+
+  @Benchmark
+  def expand_foldAppend(bh: Blackhole): Unit = {
+    val ys = (1L to size).foldLeft(xs.slice(0, 0)) {
+      case (acc, i) =>
+        //bh.consume(acc :+ 42L)
+        acc :+ i
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
+  def expand_foldAppendDouble(bh: Blackhole): Unit = {
+    val ys = (1L to size).foldLeft(xs.slice(0, 0)) {
+      case (acc, i) =>
+        bh.consume(acc :+ 42L)
+        acc :+ i
+    }
+    bh.consume(ys)
+  }
+
+  @Benchmark
+  def expand_foldAppendDoubleForeach(bh: Blackhole): Unit = {
+    val ys = (1L to size).foldLeft(xs.slice(0, 0)) {
+      case (acc, i) =>
+        bh.consume(acc :+ 42L)
+        acc :+ i
+    }
+    ys.foreach(bh.consume)
+  }
+
+  @Benchmark
+  def extract_palindrome(bh: Blackhole): Unit = {
+    def isPalindrome[A](xs: Seq[A]): Boolean = {
+      xs match {
+        case first +: middle :+ last => first == last && isPalindrome(middle)
+        case _ => true
+      }
+    }
+    bh.consume(isPalindrome(ys))
+  }
 
   @Benchmark
   @OperationsPerInvocation(1000)
@@ -138,7 +211,7 @@ class ListBenchmark {
   }
 
   @Benchmark
-  def expand_padTo(bh: Blackhole): Unit = bh.consume(xs.padTo(size * 2, 42))
+  def expand_padTo(bh: Blackhole): Unit = bh.consume(xs.padTo(size * 2, 42L))
 
   @Benchmark
   def traverse_foreach(bh: Blackhole): Unit = xs.foreach(x => bh.consume(x))
@@ -170,17 +243,17 @@ class ListBenchmark {
   }
 
   @Benchmark
-  def traverse_foldLeft(bh: Blackhole): Unit = bh.consume(xs.foldLeft(0) {
+  def traverse_foldLeft(bh: Blackhole): Unit = bh.consume(xs.foldLeft(0L) {
     case (acc, n) =>
       bh.consume(n)
-      acc + 1
+      acc + n
   })
 
   @Benchmark
-  def traverse_foldRight(bh: Blackhole): Unit = bh.consume(xs.foldRight(0) {
+  def traverse_foldRight(bh: Blackhole): Unit = bh.consume(xs.foldRight(0L) {
     case (n, acc) =>
       bh.consume(n)
-      acc - 1
+      acc - n
   })
 
   @Benchmark
@@ -222,7 +295,7 @@ class ListBenchmark {
   @Benchmark
   @OperationsPerInvocation(1000)
   def transform_updateLast(bh: Blackhole): Unit = {
-    var i = 0
+    var i = 0L
     while (i < 1000) {
       bh.consume(xs.updated(size - 1, i))
       i += 1
@@ -231,12 +304,28 @@ class ListBenchmark {
 
   @Benchmark
   @OperationsPerInvocation(1000)
-  def transform_updateRandom(bh: Blackhole): Unit = {
+  def transform_updateForeach(bh: Blackhole): Unit = {
+    var ys = xs
     var i = 0
     while (i < 1000) {
-      bh.consume(xs.updated(randomIndices(i), i))
+      ys = ys.updated(randomIndices(i), i.toLong)
+      bh.consume(ys)
       i += 1
     }
+    ys.foreach(bh.consume)
+  }
+
+  @Benchmark
+  @OperationsPerInvocation(1000)
+  def transform_updateRandom(bh: Blackhole): Unit = {
+    var ys = xs
+    var i = 0
+    while (i < 1000) {
+      ys = ys.updated(randomIndices(i), i.toLong)
+      bh.consume(ys)
+      i += 1
+    }
+    bh.consume(ys)
   }
 
   @Benchmark
@@ -256,17 +345,30 @@ class ListBenchmark {
   def transform_distinct(bh: Blackhole): Unit = bh.consume(xs.distinct)
 
   @Benchmark
-  def transform_distinctBy(bh: Blackhole): Unit = bh.consume(xs.distinctBy(_ % 2))
+  def transform_distinctBy(bh: Blackhole): Unit = bh.consume(xs.distinctBy(_ % 2L))
 
   @Benchmark
-  def transform_map(bh: Blackhole): Unit = bh.consume(xs.map(x => x + 1))
+  def transform_map(bh: Blackhole): Unit = bh.consume(xs.map((n: Long) => n + 1L))
+
+  @Benchmark
+  def transform_collect(bh: Blackhole): Unit = bh.consume(xs.collect[Long]({ case n: Long if n % 5L == 0L => n }: PartialFunction[Long, Long]))
+
+  @Benchmark
+  def transform_flatMap(bh: Blackhole): Unit = bh.consume(xs.flatMap {
+    case n if n % 3L == 0L => List(n, -n)
+    case n if n == size => List.range(1L, n)
+    case _ => Nil
+  })
+
+  @Benchmark
+  def transform_filter(bh: Blackhole): Unit = bh.consume(xs.filter(_ % 5L == 0L))
 
   @Benchmark
   @OperationsPerInvocation(100)
   def transform_span(bh: Blackhole): Unit = {
     var i = 0
     while (i < 100) {
-      val (xs1, xs2) = xs.span(x => x < randomIndices(i))
+      val (xs1, xs2) = xs.span(x => x < randomIndices(i).toLong)
       bh.consume(xs1)
       bh.consume(xs2)
       i += 1
@@ -296,7 +398,7 @@ class ListBenchmark {
 
   @Benchmark
   def transform_groupBy(bh: Blackhole): Unit = {
-    val result = xs.groupBy(_ % 5)
+    val result = xs.groupBy(_ % 5L)
     bh.consume(result)
   }
 }

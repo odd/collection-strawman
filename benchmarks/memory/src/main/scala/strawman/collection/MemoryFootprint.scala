@@ -1,10 +1,10 @@
 package bench
 
-import strawman.collection.immutable.{LazyList, List, Range, NumericRange, Vector}
+import strawman.collection.immutable.{LazyList, List, Range, NumericRange, Vector, ImmutableArray, ArraySeq}
 import strawman.collection.mutable.{ArrayBuffer, ListBuffer}
 
 import scala.{Any, AnyRef, App, Int, Long, Seq, StringContext}
-import scala.Predef.{ArrowAssoc, println, intWrapper}
+import scala.Predef.{ArrowAssoc, intWrapper}
 import scala.compat.Platform
 import java.lang.Runtime
 import java.nio.file.{Files, Paths}
@@ -48,11 +48,12 @@ object MemoryFootprint extends App {
       "TreeSet"       -> benchmark(n => strawman.collection.immutable.TreeSet((1 to n).map(_.toString): _*)),
       "ArrayBuffer"   -> benchmark(ArrayBuffer.fill(_)(obj)),
       "ListBuffer"    -> benchmark(ListBuffer.fill(_)(obj)),
-      "ImmutableArray" -> benchmark(strawman.collection.immutable.ImmutableArray.fill(_)(obj)),
-      "ImmutableArray (primitive)" -> benchmark(strawman.collection.immutable.ImmutableArray.fill(_)(123)),
+      "ImmutableArray" -> benchmark(ImmutableArray.fill(_)(obj)),
+      "scala.Array"   -> benchmark(scala.Array.fill(_)(obj)),
       "Range"         -> benchmark(Range(0, _)),
-      "NumericRange"  -> benchmark(NumericRange(0, _, 1))
-    )
+      "NumericRange"  -> benchmark(NumericRange(0, _, 1)),
+      "ArraySeq"      -> benchmark(ArraySeq.fill(_)(obj))
+  )
 
   // We use a format similar to the one used by JMH so that
   // our charts can be generated in the same way
